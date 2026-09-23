@@ -122,8 +122,9 @@ fn main() -> glib::ExitCode {
             open_app_launcher(&app);
         });
 
-        start.connect_clicked(|_| {
-            println!("Protea application surface requested");
+        let app = app.clone();
+        start.connect_clicked(move |_| {
+            open_app_launcher(&app);
         });
 
         apply_mode_policy(state.mode);
