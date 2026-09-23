@@ -45,6 +45,7 @@ fn main() -> glib::ExitCode {
         gaming.set_active(state.mode == ProteaMode::Gaming);
         let office = ToggleButton::with_label("Office");
         office.set_active(state.mode == ProteaMode::Office);
+        gaming.set_group(Some(&office));
 
         let modes = Box::new(Orientation::Horizontal, 8);
         modes.append(&gaming);
