@@ -38,6 +38,8 @@ case "$1" in
     else
       echo "Protea: graphical session unavailable; continuing with core services."
     fi
+    touch /var/run/protea-boot-ok
+    echo "PROTEA_BOOT_OK"
     ;;
   stop)
     killall protea-desktop 2>/dev/null || true
