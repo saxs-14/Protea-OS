@@ -8,7 +8,8 @@ BUILDROOT="$("${ROOT}/build/fetch-buildroot.sh")"
 mkdir -p "${BUILD_DIR}"
 "${ROOT}/build/prepare-pc-overlay.sh"
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" qemu_x86_64_defconfig
-printf "\nBR2_PACKAGE_PROTEA_CORE_CLI=y\nBR2_ROOTFS_OVERLAY=\"${ROOT}/build/pc-overlay\"\n" >> "${BUILD_DIR}/.config"
+grep -q "^BR2_PACKAGE_PROTEA_CORE_CLI=y$" "${BUILD_DIR}/.config" || echo "BR2_PACKAGE_PROTEA_CORE_CLI=y" >> "${BUILD_DIR}/.config"
+grep -q "^BR2_ROOTFS_OVERLAY=" "${BUILD_DIR}/.config" || echo "BR2_ROOTFS_OVERLAY=\"${ROOT}/build/pc-overlay\"" >> "${BUILD_DIR}/.config"
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
 
