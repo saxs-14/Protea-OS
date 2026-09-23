@@ -8,8 +8,24 @@ BUILDROOT="$("${ROOT}/build/fetch-buildroot.sh")"
 mkdir -p "${BUILD_DIR}"
 "${ROOT}/build/prepare-pc-overlay.sh"
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" qemu_x86_64_defconfig
-grep -q "^BR2_PACKAGE_PROTEA_CORE_CLI=y$" "${BUILD_DIR}/.config" || echo "BR2_PACKAGE_PROTEA_CORE_CLI=y" >> "${BUILD_DIR}/.config"
-grep -q "^BR2_ROOTFS_OVERLAY=" "${BUILD_DIR}/.config" || echo "BR2_ROOTFS_OVERLAY=\"${ROOT}/build/pc-overlay\"" >> "${BUILD_DIR}/.config"
+
+append_config() {
+  local key="$1"
+  local value="$2"
+  grep -q "^${key}=" "${BUILD_DIR}/.config" || echo "${key}=${value}" >> "${BUILD_DIR}/.config"
+}
+
+append_config "BR2_PACKAGE_PROTEA_CORE_CLI" "y"
+append_config "BR2_PACKAGE_PROTEA_DESKTOP" "y"
+append_config "BR2_PACKAGE_LIBGTK4" "y"
+append_config "BR2_PACKAGE_LIBGTK4_WAYLAND" "y"
+append_config "BR2_PACKAGE_WESTON" "y"
+append_config "BR2_PACKAGE_WESTON_DEFAULT_DRM" "y"
+append_config "BR2_PACKAGE_WESTON_SIMPLE_CLIENTS" "y"
+append_config "BR2_PACKAGE_MESA3D" "y"
+append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVM" "y"
+append_config "BR2_ROOTFS_OVERLAY" "\"${ROOT}/build/pc-overlay\""
+
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
 
