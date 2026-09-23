@@ -1,0 +1,58 @@
+name: Protea PC Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "build/**"
+      - ".github/workflows/pc-image.yml"
+  pull_request:
+    paths:
+      - "build/**"
+      - ".github/workflows/pc-image.yml"
+
+jobs:
+  build-and-boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex cpio file rsync unzip wget curl             python3 libncurses-dev qemu-system-x86
+
+      - name: Build Buildroot PC image
+        run: |
+          chmod +x build/fetch-buildroot.sh build/build-pc.sh
+          ./build/build-pc.sh
+
+      - name: Verify expected image artifacts
+        run: |
+          test -s output/pc/images/bzImage
+          test -s output/pc/images/rootfs.ext2
+          file output/pc/images/bzImage output/pc/images/rootfs.ext2
+
+      - name: Boot image in QEMU
+        run: |
+          chmod +x build/qemu/run-console.sh
+          timeout 45s build/qemu/run-console.sh > qemu-boot.log 2>&1 || code=$?
+          code="${code:-0}"
+          cat qemu-boot.log
+          if grep -q "Welcome to Buildroot" qemu-boot.log; then
+            echo "QEMU boot reached the Buildroot userspace."
+          elif [ "$code" -eq 124 ]; then
+            echo "QEMU did not exit before timeout; inspect the boot log."
+            exit 1
+          else
+            echo "QEMU boot did not reach the expected userspace marker."
+            exit 1
+          fi
+
+      - name: Upload QEMU boot log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: protea-qemu-boot-log
+          path: qemu-boot.log
