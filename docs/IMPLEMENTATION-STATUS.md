@@ -25,6 +25,9 @@ This document records what is actually implemented in the repository. It deliber
 - Application discovery from standard .desktop application directories.
 - Application launch through discovered desktop entries.
 - Taskbar/start surface foundation.
+- Settings window with local identity/device/mode information.
+- Restart and shutdown controls using the underlying Linux power commands.
+- QEMU virtio networking with BusyBox DHCP startup support.
 
 ### Phone launcher
 - Real Android Activity configured as a HOME/launcher application.
@@ -40,6 +43,7 @@ This document records what is actually implemented in the repository. It deliber
 - Android debug-build automation.
 - Buildroot bootstrap/build scripts pinned to a reproducible LTS release.
 - QEMU-first PC validation plan.
+- Explicit Protea boot-readiness marker checked by CI.
 - Buildroot package for the Protea GTK4 desktop shell.
 - Wayland/Weston and Mesa software-rendering integration for the PC image.
 - QEMU virtio-GPU and DRM kernel configuration fragment.
