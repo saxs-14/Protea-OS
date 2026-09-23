@@ -21,7 +21,10 @@ fn main() {
     state.set_mode(ProteaMode::Office);
 
     println!("Protea OS shared core");
-    println!("identity: {}", state.identity.as_ref().unwrap().display_name);
+    println!(
+        "identity: {}",
+        state.identity.as_ref().unwrap().display_name
+    );
     println!("mode: {:?}", state.mode);
     println!("theme: {}", state.settings.get("theme").unwrap());
     println!(
