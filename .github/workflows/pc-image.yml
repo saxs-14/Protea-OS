@@ -48,8 +48,11 @@ jobs:
           timeout 45s build/qemu/run-console.sh > qemu-boot.log 2>&1 || code=$?
           code="${code:-0}"
           cat qemu-boot.log
-          if grep -q "Welcome to Buildroot" qemu-boot.log; then
-            echo "QEMU boot reached the Buildroot userspace."
+          if grep -q "PROTEA_BOOT_OK" qemu-boot.log; then
+            echo "QEMU boot reached Protea system readiness."
+          elif grep -q "Welcome to Buildroot" qemu-boot.log; then
+            echo "QEMU boot reached the Buildroot userspace, but Protea readiness marker was not observed."
+            exit 1
           elif [ "$code" -eq 124 ]; then
             echo "QEMU did not exit before timeout; inspect the boot log."
             exit 1
