@@ -413,25 +413,33 @@ fn shell_like_tokens(input: &str) -> Option<Vec<String>> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut chars = input.chars().peekable();
-    let mut quote = None;
+    let mut quote: Option<char> = None;
 
     while let Some(ch) = chars.next() {
-        match quote {
-            Some(q) if ch == q => quote = None,
-            Some('"') => current.push(ch),
-            Some('\') => current.push(ch),
-            Some(_) => current.push(ch),
-            None if ch == '\' => {
+        if let Some(q) = quote {
+            if ch == q {
+                quote = None;
+            } else if q == '"' && ch == '\\' {
+                let next = chars.next()?;
+                current.push(next);
+            } else {
+                current.push(ch);
+            }
+            continue;
+        }
+
+        match ch {
+            '"' | '\\'' => quote = Some(ch),
+            '\\' => {
                 let next = chars.next()?;
                 current.push(next);
             }
-            None if ch == '"' || ch == '\'' => quote = Some(ch),
-            None if ch.is_whitespace() => {
+            c if c.is_whitespace() => {
                 if !current.is_empty() {
                     tokens.push(std::mem::take(&mut current));
                 }
             }
-            None => current.push(ch),
+            c => current.push(c),
         }
     }
 
@@ -443,6 +451,7 @@ fn shell_like_tokens(input: &str) -> Option<Vec<String>> {
     }
     Some(tokens)
 }
+
 
 fn launch_application(command: &[String]) -> std::io::Result<std::process::Child> {
     let Some(program) = command.first() else {
