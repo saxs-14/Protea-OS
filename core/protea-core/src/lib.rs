@@ -64,6 +64,33 @@ impl PermissionSet {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModePolicy {
+    pub suppress_nonessential_notifications: bool,
+    pub allow_background_sync: bool,
+    pub prefer_performance: bool,
+    pub prefer_battery: bool,
+}
+
+impl ModePolicy {
+    pub fn for_mode(mode: ProteaMode) -> Self {
+        match mode {
+            ProteaMode::Gaming => Self {
+                suppress_nonessential_notifications: true,
+                allow_background_sync: false,
+                prefer_performance: true,
+                prefer_battery: false,
+            },
+            ProteaMode::Office => Self {
+                suppress_nonessential_notifications: false,
+                allow_background_sync: true,
+                prefer_performance: false,
+                prefer_battery: true,
+            },
+        }
+    }
+}
+
 pub struct ProteaState {
     pub identity: Option<ProteaIdentity>,
     pub settings: Settings,
@@ -98,6 +125,18 @@ mod tests {
         permissions.revoke(Permission::Network);
         assert!(!permissions.is_granted(Permission::Network));
     }
+    #[test]
+    fn mode_policy_matches_mode() {
+        let gaming = ModePolicy::for_mode(ProteaMode::Gaming);
+        assert!(gaming.prefer_performance);
+        assert!(gaming.suppress_nonessential_notifications);
+        assert!(!gaming.allow_background_sync);
+
+        let office = ModePolicy::for_mode(ProteaMode::Office);
+        assert!(office.prefer_battery);
+        assert!(office.allow_background_sync);
+    }
+
     #[test]
     fn state_starts_in_office_mode() {
         let state = ProteaState::new(DeviceProfile::new(DeviceClass::Pc, HardwareTier::Minimum, 2048, 32768, false, true));
