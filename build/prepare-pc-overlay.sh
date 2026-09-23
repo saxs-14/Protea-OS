@@ -11,21 +11,30 @@ cat > "${OVERLAY}/etc/init.d/S99protea" <<'EOF'
 case "$1" in
   start)
     echo "Starting Protea core..."
-    mkdir -p /var/lib/protea
-    chmod 700 /var/lib/protea
-    export PROTEA_STATE_FILE=/var/lib/protea/state
+    PROTEA_HOME=/home/protea
+    PROTEA_STATE_DIR="$PROTEA_HOME/.local/share/protea"
+    PROTEA_STATE_FILE="$PROTEA_STATE_DIR/state"
+
+    if ! id protea >/dev/null 2>&1; then
+      echo "Protea validation error: unprivileged protea user is missing."
+      exit 1
+    fi
+
+    mkdir -p "$PROTEA_STATE_DIR"
+    chown -R protea:protea "$PROTEA_HOME"
+    chmod 700 "$PROTEA_HOME" "$PROTEA_HOME/.local" "$PROTEA_STATE_DIR"
 
     if [ ! -x /usr/bin/protea-core ]; then
       echo "Protea validation error: /usr/bin/protea-core is missing."
       exit 1
     fi
 
-    if ! /usr/bin/protea-core status; then
+    if ! su -s /bin/sh protea -c "PROTEA_STATE_FILE='$PROTEA_STATE_FILE' /usr/bin/protea-core status"; then
       echo "Protea validation error: core status failed."
       exit 1
     fi
 
-    if [ ! -s /var/lib/protea/state ]; then
+    if [ ! -s "$PROTEA_STATE_FILE" ]; then
       echo "Protea validation error: persistent state was not created."
       exit 1
     fi
@@ -43,7 +52,8 @@ case "$1" in
         i=$((i + 1))
       done
       if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
-        /usr/bin/protea-desktop &
+        chmod 666 "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
