@@ -179,7 +179,7 @@ fn escape(value: &str) -> String {
 }
 
 fn unescape(value: &str) -> String {
-    value.replace("%0A", "\\n").replace("%7C", "|").replace("%25", "%")
+    value.replace("%0A", "\n").replace("%7C", "|").replace("%25", "%")
 }
 
 fn parse_u32(v: &str, k: &str) -> Result<u32, StateStoreError> { v.parse().map_err(|_| invalid(k)) }
