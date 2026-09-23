@@ -3,13 +3,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVERLAY="${ROOT}/build/pc-overlay"
-BIN_DIR="${OVERLAY}/usr/bin"
 INIT_DIR="${OVERLAY}/etc/init.d"
 
-mkdir -p "${BIN_DIR}" "${INIT_DIR}"
-
-cargo build --manifest-path "${ROOT}/core/Cargo.toml" --release -p protea-core-cli
-install -m 0755 "${ROOT}/target/release/protea-core-cli" "${BIN_DIR}/protea-core"
+mkdir -p "${INIT_DIR}"
 
 cat > "${INIT_DIR}/S99protea" <<'EOF'
 #!/bin/sh
