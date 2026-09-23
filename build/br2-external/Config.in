@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_PROTEA_PATH/package/protea-core-cli/Config.in"
