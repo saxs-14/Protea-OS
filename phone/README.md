@@ -1,13 +1,16 @@
 # Protea Phone
 
-The phone platform will use AOSP as its foundation.
+The phone path now contains a real Android launcher project that can be built and installed independently while the full AOSP integration is developed.
 
-Development order:
+Android 17 is API level 37. The current launcher project targets API 37 and uses Android Gradle Plugin 8.9.0 or newer, matching the Android 17 SDK setup guidance.
 
-1. build and boot an unmodified supported AOSP target;
-2. establish the Protea integration boundary;
-3. add the Protea launcher/shell;
-4. integrate shared identity/settings contracts;
-5. validate real-device behavior.
+This launcher is an integration-stage component, not a claim that Protea is already an AOSP system image.
 
-AOSP compatibility and security requirements remain upstream constraints.
+AOSP integration remains:
+
+1. build unmodified AOSP;
+2. boot a supported target;
+3. install/replace the launcher in a controlled development build;
+4. integrate Protea identity/settings;
+5. add system-level services only where justified;
+6. validate security, recovery and updates.
