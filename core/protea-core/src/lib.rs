@@ -73,7 +73,6 @@ impl PermissionSet {
     pub fn is_granted(&self, permission: Permission) -> bool { self.granted.contains(&permission) }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModePolicy {
     pub suppress_nonessential_notifications: bool,
