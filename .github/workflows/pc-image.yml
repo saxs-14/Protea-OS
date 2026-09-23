@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "build/**"
+      - "core/**"
+      - "pc/**"
       - ".github/workflows/pc-image.yml"
   pull_request:
     paths:
@@ -14,7 +16,7 @@ on:
 jobs:
   build-and-boot:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
