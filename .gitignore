@@ -1,0 +1,13 @@
+/target/
+**/target/
+output/
+buildroot-*/
+*.img
+*.iso
+*.qcow2
+*.raw
+*.swp
+*.tmp
+.env
+.env.*
+!.env.example
