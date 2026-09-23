@@ -1,0 +1,10 @@
+#!/bin/sh
+case "$1" in
+  start)
+    mkdir -p /var/log
+    echo "Protea system services ready."
+    ;;
+  stop)
+    ;;
+esac
+exit 0
