@@ -40,7 +40,8 @@ jobs:
         run: |
           test -s output/pc/images/bzImage
           test -s output/pc/images/rootfs.ext2
-          file output/pc/images/bzImage output/pc/images/rootfs.ext2
+          test -s output/pc/images/rootfs.iso9660
+          file output/pc/images/bzImage output/pc/images/rootfs.ext2 output/pc/images/rootfs.iso9660
 
       - name: Boot image in QEMU
         run: |
