@@ -15,7 +15,7 @@ import java.util.List;
 
 public final class MainActivity extends Activity {
     private static final String PREFS = "protea_launcher";
-    private static final String MODE = "mode";
+    private static final String MODE_KEY = "mode";
     private TextView mode;
     private SharedPreferences preferences;
 
@@ -39,7 +39,7 @@ public final class MainActivity extends Activity {
         subtitle.setTextSize(16);
 
         mode = new TextView(this);
-        mode.setText("Mode: " + preferences.getString(MODE, "Office"));
+        mode.setText("Mode: " + preferences.getString(MODE_KEY, "Office"));
         mode.setTextSize(18);
 
         LinearLayout modes = new LinearLayout(this);
@@ -72,7 +72,7 @@ public final class MainActivity extends Activity {
     }
 
     private void setMode(String value) {
-        preferences.edit().putString(MODE, value).apply();
+        preferences.edit().putString(MODE_KEY, value).apply();
         mode.setText("Mode: " + value);
     }
 
