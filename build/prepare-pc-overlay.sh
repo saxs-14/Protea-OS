@@ -41,9 +41,12 @@ case "$1" in
 
     if [ -x /usr/bin/weston ] && [ -x /usr/bin/protea-desktop ] && [ -e /dev/dri/card0 ]; then
       echo "Starting Protea graphical session..."
-      mkdir -p /run/user/0
-      chmod 700 /run/user/0
-      export XDG_RUNTIME_DIR=/run/user/0
+      PROTEA_UID="$(id -u protea)"
+      PROTEA_RUNTIME_DIR="/run/user/$PROTEA_UID"
+      mkdir -p "$PROTEA_RUNTIME_DIR"
+      chown protea:protea "$PROTEA_RUNTIME_DIR"
+      chmod 700 "$PROTEA_RUNTIME_DIR"
+      export XDG_RUNTIME_DIR="$PROTEA_RUNTIME_DIR"
       export WAYLAND_DISPLAY=wayland-0
       weston --backend=drm-backend.so --tty=1 --log=/var/log/weston.log &
       i=0
@@ -52,7 +55,6 @@ case "$1" in
         i=$((i + 1))
       done
       if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
-        chmod 666 "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
         su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK"
       else
