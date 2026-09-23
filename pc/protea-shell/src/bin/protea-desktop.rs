@@ -429,7 +429,7 @@ fn shell_like_tokens(input: &str) -> Option<Vec<String>> {
         }
 
         match ch {
-            '"' | '\\'' => quote = Some(ch),
+            '"' | '\'' => quote = Some(ch),
             '\\' => {
                 let next = chars.next()?;
                 current.push(next);
