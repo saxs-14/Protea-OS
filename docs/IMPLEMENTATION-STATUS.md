@@ -45,6 +45,7 @@ This document records what is actually implemented in the repository. It deliber
 - QEMU-first PC validation plan.
 - Explicit Protea boot-readiness marker checked by CI.
 - Buildroot package for the Protea GTK4 desktop shell.
+- Bootable x86_64 ISO generation path using GRUB 2 and an initramfs.
 - Wayland/Weston and Mesa software-rendering integration for the PC image.
 - QEMU virtio-GPU and DRM kernel configuration fragment.
 - Cross-device contract and architecture documentation.
@@ -55,7 +56,7 @@ The repository does **not** yet contain a complete installable Protea OS release
 
 The following still require implementation and/or real-world validation:
 
-1. Verified bootable Protea PC image with the Protea session integrated.
+1. Verified bootable Protea PC image with the Protea session integrated; automated QEMU/ISO validation is still running.
 2. Real graphical login/session startup.
 3. Wayland compositor/window-management integration.
 4. Full desktop shell: settings, notifications, networking, file manager, system tray, lock screen and shutdown/reboot controls.
