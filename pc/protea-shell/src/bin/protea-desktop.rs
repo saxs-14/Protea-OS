@@ -31,8 +31,10 @@ fn main() -> glib::ExitCode {
         subtitle.add_css_class("dim-label");
 
         let status = Label::new(Some(&format!(
-            "Device: {:?}  •  Tier: {:?}  •  Mode: {:?}",
-            state.device.class, state.device.tier, state.mode
+            "Device: {:?}  •  Tier: {:?}  •  RAM: {} MB  •  Storage: {} MB  •  GPU: {}  •  Battery: {}  •  Mode: {:?}",
+            state.device.class, state.device.tier, state.device.memory_mb, state.device.storage_mb,
+            if state.device.has_gpu { "yes" } else { "no" },
+            if state.device.has_battery { "yes" } else { "no" }, state.mode
         )));
 
         let start = Button::with_label("Start");
@@ -139,13 +141,14 @@ fn load_or_initialize(store: &StateStore) -> ProteaState {
         return state;
     }
 
+    let memory_mb = detect_memory_mb();
     let mut state = ProteaState::new(DeviceProfile::new(
         DeviceClass::Pc,
-        HardwareTier::from_memory_mb(detect_memory_mb()),
-        detect_memory_mb(),
-        0,
-        true,
-        true,
+        HardwareTier::from_memory_mb(memory_mb),
+        memory_mb,
+        detect_storage_mb(),
+        detect_gpu(),
+        detect_battery(),
     ));
     state.set_identity(ProteaIdentity::new("local-0001", "Protea User"));
     state.settings.set("theme", "coral");
@@ -180,4 +183,35 @@ fn apply_css() {
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
     }
+}
+
+
+fn detect_storage_mb() -> u64 {
+    std::process::Command::new("df")
+        .args(["-Pm", "/"])
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .and_then(|text| text.lines().nth(1).map(str::to_string))
+        .and_then(|line| line.split_whitespace().nth(1).and_then(|v| v.parse::<u64>().ok()))
+        .unwrap_or(0)
+}
+
+fn detect_gpu() -> bool {
+    std::fs::read_dir("/sys/class/drm")
+        .ok()
+        .map(|entries| entries.flatten().any(|entry| {
+            entry.file_name().to_string_lossy().starts_with("card")
+        }))
+        .unwrap_or(false)
+}
+
+fn detect_battery() -> bool {
+    std::fs::read_dir("/sys/class/power_supply")
+        .ok()
+        .map(|entries| entries.flatten().any(|entry| {
+            let name = entry.file_name().to_string_lossy().to_ascii_uppercase();
+            name.starts_with("BAT")
+        }))
+        .unwrap_or(false)
 }
