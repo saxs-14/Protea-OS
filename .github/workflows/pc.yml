@@ -1,0 +1,23 @@
+name: Protea PC
+
+on:
+  push:
+    branches: [main]
+    paths: ["core/**", "pc/**", ".github/workflows/pc.yml"]
+  pull_request:
+    paths: ["core/**", "pc/**", ".github/workflows/pc.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GTK development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - working-directory: pc
+        run: cargo check --workspace
+      - working-directory: pc
+        run: cargo fmt --all -- --check
