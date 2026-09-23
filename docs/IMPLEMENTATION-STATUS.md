@@ -74,7 +74,7 @@ Core contracts, local state, CI, initial PC shell and Android launcher exist.
 ### Phase 2 — Real PC system
 **Status: in progress**
 
-Next work is to turn the Linux/Buildroot foundation into a bootable QEMU system and start Protea automatically as a graphical session.
+The repository now contains a Buildroot external tree for the Protea Rust core, a root filesystem init hook, and an automated QEMU build/boot workflow. The remaining work is to make the complete graphical Protea session boot automatically.
 
 ### Phase 3 — PC hardware adaptation
 **Status: in progress**
