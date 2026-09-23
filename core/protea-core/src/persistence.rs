@@ -225,6 +225,7 @@ mod tests {
         ));
         state.set_identity(ProteaIdentity::new("user-1", "Protea User"));
         state.settings.set("theme", "coral");
+        state.settings.set("multiline", "line1\nline2");
         state.permissions.grant(crate::Permission::Network);
         state.set_mode(ProteaMode::Gaming);
 
@@ -232,6 +233,7 @@ mod tests {
         let loaded = store.load().unwrap();
 
         assert_eq!(loaded, state);
+        assert_eq!(loaded.settings.get("multiline"), Some("line1\nline2"));
         let _ = fs::remove_file(path);
     }
 }
