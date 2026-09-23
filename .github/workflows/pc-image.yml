@@ -25,7 +25,7 @@ jobs:
 
       - name: Build Buildroot PC image
         run: |
-          chmod +x build/fetch-buildroot.sh build/build-pc.sh
+          chmod +x build/fetch-buildroot.sh build/build-pc.sh build/prepare-pc-overlay.sh build/qemu/run-console.sh
           ./build/build-pc.sh
 
       - name: Verify expected image artifacts
