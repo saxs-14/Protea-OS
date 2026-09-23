@@ -87,4 +87,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: protea-qemu-boot-log
-          path: qemu-boot.log
+          path: |
+            qemu-boot.log
+            qemu-iso-boot.log
