@@ -142,14 +142,14 @@ fn main() -> glib::ExitCode {
             }
         });
 
-        let app = app.clone();
+        let start_menu_app = app.clone();
         start_menu.connect_clicked(move |_| {
-            open_app_launcher(&app);
+            open_app_launcher(&start_menu_app);
         });
 
-        let app = app.clone();
+        let start_app = app.clone();
         start.connect_clicked(move |_| {
-            open_app_launcher(&app);
+            open_app_launcher(&start_app);
         });
 
         apply_mode_policy(state.mode);
