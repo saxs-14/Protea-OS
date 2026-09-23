@@ -19,3 +19,10 @@ jobs:
       - run: cargo fmt --all
       - run: cargo test --workspace
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: CLI persistence smoke test
+        run: |
+          STATE="$(mktemp)"
+          PROTEA_STATE_FILE="$STATE" cargo run -q -p protea-core-cli -- status
+          PROTEA_STATE_FILE="$STATE" cargo run -q -p protea-core-cli -- gaming
+          test "$(PROTEA_STATE_FILE="$STATE" cargo run -q -p protea-core-cli -- status | grep "^mode:" | tr -d "\r")" = "mode: Gaming"
+          rm -f "$STATE"
