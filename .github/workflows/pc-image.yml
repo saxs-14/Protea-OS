@@ -13,6 +13,10 @@ on:
       - "build/**"
       - ".github/workflows/pc-image.yml"
 
+concurrency:
+  group: protea-pc-image-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-boot:
     runs-on: ubuntu-latest
