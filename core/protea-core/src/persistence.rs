@@ -88,13 +88,7 @@ fn serialize(state: &ProteaState) -> String {
 }
 
 fn settings_pairs(settings: &Settings) -> Vec<(String, String)> {
-    let mut pairs = Vec::new();
-    for key in ["theme", "language", "timezone", "animations"] {
-        if let Some(value) = settings.get(key) {
-            pairs.push((key.to_string(), value.to_string()));
-        }
-    }
-    pairs
+    settings.iter().map(|(key, value)| (key.to_string(), value.to_string())).collect()
 }
 
 fn deserialize(data: &str) -> Result<ProteaState, StateStoreError> {
