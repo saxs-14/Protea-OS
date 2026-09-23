@@ -1,0 +1,9 @@
+[package]
+name = "protea-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared local-first system contracts for Protea OS"
+license = "TBD"
+
+[lib]
+path = "src/lib.rs"
