@@ -1,4 +1,5 @@
 use gtk::prelude::*;
+use std::collections::BTreeMap;
 use gtk::{glib, Application, ApplicationWindow, Box, Button, Label, Orientation, Separator, ToggleButton};
 use protea_core::{DeviceClass, DeviceProfile, HardwareTier, Permission, ProteaIdentity, ProteaMode, ProteaState, StateStore};
 
@@ -114,8 +115,9 @@ fn main() -> glib::ExitCode {
             }
         });
 
-        start_menu.connect_clicked(|_| {
-            println!("Protea start surface requested");
+        let app = app.clone();
+        start_menu.connect_clicked(move |_| {
+            open_app_launcher(&app);
         });
 
         start.connect_clicked(|_| {
@@ -214,4 +216,108 @@ fn detect_battery() -> bool {
             name.starts_with("BAT")
         }))
         .unwrap_or(false)
+}
+
+
+fn open_app_launcher(app: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Protea Applications")
+        .default_width(520)
+        .default_height(620)
+        .build();
+
+    let root = Box::new(Orientation::Vertical, 12);
+    root.set_margin_top(20);
+    root.set_margin_bottom(20);
+    root.set_margin_start(20);
+    root.set_margin_end(20);
+
+    let title = Label::new(Some("Applications"));
+    title.add_css_class("title-2");
+    root.append(&title);
+
+    let list = gtk::ListBox::new();
+    list.set_selection_mode(gtk::SelectionMode::None);
+
+    let applications = discover_applications();
+    if applications.is_empty() {
+        list.append(&Label::new(Some("No desktop applications were found.")));
+    } else {
+        for (name, command) in applications {
+            let button = Button::with_label(&name);
+            button.set_halign(gtk::Align::Fill);
+            button.set_hexpand(true);
+            let launch_command = command.clone();
+            button.connect_clicked(move |_| {
+                let _ = launch_application(&launch_command);
+            });
+            list.append(&button);
+        }
+    }
+
+    root.append(&list);
+    window.set_child(Some(&root));
+    window.present();
+}
+
+fn discover_applications() -> Vec<(String, String)> {
+    let mut apps = BTreeMap::<String, String>::new();
+    let mut directories = vec![std::path::PathBuf::from("/usr/share/applications")];
+
+    if let Ok(home) = std::env::var("HOME") {
+        directories.push(std::path::PathBuf::from(home).join(".local/share/applications"));
+    }
+
+    for directory in directories {
+        let Ok(entries) = std::fs::read_dir(directory) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|v| v.to_str()) != Some("desktop") {
+                continue;
+            }
+
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let mut name = None;
+            let mut exec = None;
+            let mut is_application = false;
+
+            for line in text.lines() {
+                if line == "[Desktop Entry]" {
+                    is_application = true;
+                } else if is_application && line.starts_with("Name=") && name.is_none() {
+                    name = Some(line[5..].trim().to_string());
+                } else if is_application && line.starts_with("Exec=") && exec.is_none() {
+                    exec = Some(line[5..].trim().to_string());
+                } else if is_application && line.starts_with("[") {
+                    break;
+                }
+            }
+
+            if let (Some(name), Some(exec)) = (name, exec) {
+                let command = sanitize_exec_command(&exec);
+                if !command.is_empty() {
+                    apps.entry(name).or_insert(command);
+                }
+            }
+        }
+    }
+
+    apps.into_iter().collect()
+}
+
+fn sanitize_exec_command(exec: &str) -> String {
+    exec.split_whitespace()
+        .filter(|part| !part.starts_with('%'))
+        .map(|part| part.trim_matches('"'))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn launch_application(command: &str) -> std::io::Result<std::process::Child> {
+    let mut parts = command.split_whitespace();
+    let Some(program) = parts.next() else {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "empty command"));
+    };
+    std::process::Command::new(program).args(parts).spawn()
 }
