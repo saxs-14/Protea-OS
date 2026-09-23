@@ -13,26 +13,26 @@ This roadmap describes the path from an empty repository to a real operating sys
 
 ## Phase 1 — Shared core
 
-- [ ] Define stable identity model
-- [ ] Define settings model
-- [ ] Define permission model
-- [ ] Define device profile
-- [ ] Implement local persistence
-- [ ] Add unit/integration tests
-- [ ] Define versioned core API
-- [ ] Document compatibility rules
+- [x] Define stable identity model
+- [x] Define settings model
+- [x] Define permission model
+- [x] Define device profile
+- [x] Implement local persistence
+- [x] Add unit/integration tests
+- [x] Define versioned core API
+- [x] Document compatibility rules
 
 ## Phase 2 — Real PC shell
 
-- [ ] Linux session bootstrap
-- [ ] Desktop shell process
-- [ ] Taskbar
+- [x] Linux session bootstrap
+- [x] Desktop shell process
+- [x] Taskbar
 - [ ] Application/start surface
 - [ ] Window/application launching
-- [ ] Protea settings surface
-- [ ] Shared-core integration
+- [x] Protea settings surface
+- [x] Shared-core integration
 - [ ] Basic accessibility
-- [ ] Keyboard and mouse navigation
+- [x] Keyboard and mouse navigation
 
 ## Phase 3 — Real operating modes
 
