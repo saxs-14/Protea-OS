@@ -94,10 +94,9 @@ fn main() -> glib::ExitCode {
 
         content.append(&system);
 
-        let settings_state = state.clone();
         let settings_app = app.clone();
         settings_button.connect_clicked(move |_| {
-            open_settings_window(&settings_app, &settings_state);
+            open_settings_window(&settings_app);
         });
 
         reboot_button.connect_clicked(move |_| {
@@ -352,12 +351,15 @@ fn launch_application(command: &str) -> std::io::Result<std::process::Child> {
 }
 
 
-fn open_settings_window(app: &Application, state: &ProteaState) {
+fn open_settings_window(app: &Application) {
+    let store = StateStore::new(state_path());
+    let state = load_or_initialize(&store);
+
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Protea Settings")
-        .default_width(560)
-        .default_height(420)
+        .default_width(600)
+        .default_height(520)
         .build();
 
     let root = Box::new(Orientation::Vertical, 14);
@@ -371,25 +373,59 @@ fn open_settings_window(app: &Application, state: &ProteaState) {
     root.append(&title);
 
     root.append(&Label::new(Some(&format!(
-        "Identity: {}",
-        state.identity.as_ref().map(|i| i.display_name.as_str()).unwrap_or("Not configured")
+        "Device: {:?}  •  Tier: {:?}  •  Mode: {:?}",
+        state.device.class, state.device.tier, state.mode
     ))));
-    root.append(&Label::new(Some(&format!(
-        "Device: {:?}  •  Tier: {:?}",
-        state.device.class, state.device.tier
-    ))));
-    root.append(&Label::new(Some(&format!(
-        "Mode: {:?}  •  Local settings: {}",
-        state.mode, state.settings.len()
-    ))));
-    root.append(&Label::new(Some(
-        "Protea keeps these settings locally until secure cross-device synchronization is enabled."
-    )));
 
+    let identity_text = state.identity.as_ref()
+        .map(|identity| identity.display_name.as_str())
+        .unwrap_or("Not configured");
+    root.append(&Label::new(Some(&format!("Local identity: {identity_text}"))));
+
+    let theme_row = Box::new(Orientation::Horizontal, 10);
+    let theme_label = Label::new(Some("Theme"));
+    theme_label.set_width_chars(12);
+    let theme_entry = gtk::Entry::new();
+    theme_entry.set_hexpand(true);
+    theme_entry.set_text(state.settings.get("theme").unwrap_or("coral"));
+    theme_row.append(&theme_label);
+    theme_row.append(&theme_entry);
+    root.append(&theme_row);
+
+    let info = Label::new(Some(&format!(
+        "{} local settings. Changes are written to the local Protea state file.",
+        state.settings.len()
+    )));
+    info.add_css_class("dim-label");
+    root.append(&info);
+
+    let actions = Box::new(Orientation::Horizontal, 10);
+    let save = Button::with_label("Save");
+    save.add_css_class("suggested-action");
     let close = Button::with_label("Close");
+    actions.append(&save);
+    actions.append(&close);
+    root.append(&actions);
+
+    let save_store = StateStore::new(state_path());
+    let save_entry = theme_entry.clone();
+    let save_info = info.clone();
+    save.connect_clicked(move |_| {
+        let mut current = load_or_initialize(&save_store);
+        let theme = save_entry.text().trim().to_string();
+        if theme.is_empty() {
+            save_info.set_text("Theme cannot be empty.");
+            return;
+        }
+        current.settings.set("theme", theme);
+        match save_store.save(&current) {
+            Ok(()) => save_info.set_text("Settings saved locally."),
+            Err(error) => save_info.set_text(&format!("Could not save settings: {error:?}")),
+        }
+    });
+
     let window_close = window.clone();
     close.connect_clicked(move |_| window_close.close());
-    root.append(&close);
 
     window.set_child(Some(&root));
     window.present();
@@ -397,11 +433,35 @@ fn open_settings_window(app: &Application, state: &ProteaState) {
 
 fn request_power_action(action: &str) {
     let command = if action == "reboot" { "reboot" } else { "poweroff" };
-    match std::process::Command::new(command).status() {
-        Ok(status) if status.success() => {}
-        Ok(status) => eprintln!("Protea: {} exited with {}", command, status),
-        Err(error) => eprintln!("Protea: could not execute {}: {}", command, error),
-    }
+    let action_name = if action == "reboot" { "restart" } else { "shut down" };
+
+    let dialog = gtk::MessageDialog::builder()
+        .text(format!("Confirm {action_name}?"))
+        .secondary_text("Any unsaved application data may be lost.")
+        .buttons(gtk::ButtonsType::Cancel)
+        .build();
+    dialog.add_button(action_name, gtk::ResponseType::Accept);
+
+    dialog.connect_response(move |dialog, response| {
+        dialog.close();
+        if response != gtk::ResponseType::Accept {
+            return;
+        }
+
+        let status = std::process::Command::new("loginctl")
+            .arg(if action == "reboot" { "reboot" } else { "poweroff" })
+            .status();
+
+        if !matches!(status, Ok(status) if status.success()) {
+            match std::process::Command::new(command).status() {
+                Ok(status) if status.success() => {}
+                Ok(status) => eprintln!("Protea: {} exited with {}", command, status),
+                Err(error) => eprintln!("Protea: could not execute {}: {}", command, error),
+            }
+        }
+    });
+
+    dialog.present();
 }
 
 fn apply_mode_policy(mode: ProteaMode) {
