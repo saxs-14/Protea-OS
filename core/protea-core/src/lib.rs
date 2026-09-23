@@ -13,6 +13,16 @@ pub enum DeviceClass { Pc, Phone, Watch, Tv }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HardwareTier { Minimum, Recommended, Full }
 
+impl HardwareTier {
+    pub fn from_memory_mb(memory_mb: u64) -> Self {
+        match memory_mb {
+            0..=4095 => Self::Minimum,
+            4096..=8191 => Self::Recommended,
+            _ => Self::Full,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProteaMode { Gaming, Office }
 
@@ -125,6 +135,13 @@ mod tests {
         permissions.revoke(Permission::Network);
         assert!(!permissions.is_granted(Permission::Network));
     }
+    #[test]
+    fn hardware_tier_scales_from_memory() {
+        assert_eq!(HardwareTier::from_memory_mb(2048), HardwareTier::Minimum);
+        assert_eq!(HardwareTier::from_memory_mb(4096), HardwareTier::Recommended);
+        assert_eq!(HardwareTier::from_memory_mb(16384), HardwareTier::Full);
+    }
+
     #[test]
     fn mode_policy_matches_mode() {
         let gaming = ModePolicy::for_mode(ProteaMode::Gaming);
