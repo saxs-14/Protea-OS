@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -35,7 +35,26 @@ impl StateStore {
             fs::create_dir_all(parent)?;
         }
 
-        let mut file = File::create(&tmp)?;
+        let mut file = {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                OpenOptions::new()
+                    .create(true)
+                    .truncate(true)
+                    .write(true)
+                    .mode(0o600)
+                    .open(&tmp)?
+            }
+            #[cfg(not(unix))]
+            {
+                OpenOptions::new()
+                    .create(true)
+                    .truncate(true)
+                    .write(true)
+                    .open(&tmp)?
+            }
+        };
         file.write_all(data.as_bytes())?;
         file.sync_all()?;
         drop(file);
