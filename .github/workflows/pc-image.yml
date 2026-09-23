@@ -33,7 +33,7 @@ jobs:
 
       - name: Build Buildroot PC image
         run: |
-          chmod +x build/fetch-buildroot.sh build/build-pc.sh build/prepare-pc-overlay.sh build/qemu/run-console.sh
+          chmod +x build/fetch-buildroot.sh build/build-pc.sh build/prepare-pc-overlay.sh build/qemu/run-console.sh build/validate-pc-image.sh
           ./build/build-pc.sh
 
       - name: Verify expected image artifacts
@@ -42,6 +42,11 @@ jobs:
           test -s output/pc/images/rootfs.ext2
           test -s output/pc/images/rootfs.iso9660
           file output/pc/images/bzImage output/pc/images/rootfs.ext2 output/pc/images/rootfs.iso9660
+
+      - name: Validate built PC image
+        run: |
+          sudo apt-get install -y e2fsprogs
+          ./build/validate-pc-image.sh
 
       - name: Boot image in QEMU
         run: |
