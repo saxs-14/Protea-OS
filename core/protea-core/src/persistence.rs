@@ -162,11 +162,11 @@ fn deserialize(data: &str) -> Result<ProteaState, StateStoreError> {
 }
 
 fn escape(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('|', "\p").replace('\n', "\\n")
+    value.replace('%', "%25").replace('|', "%7C").replace('\\n', "%0A")
 }
 
 fn unescape(value: &str) -> String {
-    value.replace("\n", "\n").replace("\p", "|").replace("\\", "\\")
+    value.replace("%0A", "\\n").replace("%7C", "|").replace("%25", "%")
 }
 
 fn parse_u32(v: &str, k: &str) -> Result<u32, StateStoreError> { v.parse().map_err(|_| invalid(k)) }
