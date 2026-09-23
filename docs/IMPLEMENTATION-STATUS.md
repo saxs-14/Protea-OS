@@ -42,6 +42,7 @@ This document records what is actually implemented in the repository. It deliber
 - Formatting, unit tests, and Clippy enforcement for the Rust core.
 - Android debug-build automation.
 - Buildroot bootstrap/build scripts pinned to a reproducible LTS release.
+- PC image CI concurrency control so stale image builds do not occupy the runner queue indefinitely.
 - QEMU-first PC validation plan.
 - Explicit Protea boot-readiness marker checked by CI.
 - Buildroot package for the Protea GTK4 desktop shell.
@@ -56,7 +57,7 @@ The repository does **not** yet contain a complete installable Protea OS release
 
 The following still require implementation and/or real-world validation:
 
-1. Verified bootable Protea PC image with the Protea session integrated; automated QEMU/ISO validation is still running.
+1. Verified bootable Protea PC image with the Protea session integrated; automated QEMU/ISO validation is being executed; the workflow now serializes image builds so only the current main revision consumes the build runner.
 2. Real graphical login/session startup.
 3. Wayland compositor/window-management integration.
 4. Full desktop shell: settings, notifications, networking, file manager, system tray, lock screen and shutdown/reboot controls.
