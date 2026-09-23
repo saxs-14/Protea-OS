@@ -84,6 +84,30 @@ fn main() -> glib::ExitCode {
         taskbar.append(&start_menu);
         taskbar.append(&clock);
 
+        let system = Box::new(Orientation::Horizontal, 8);
+        let settings_button = Button::with_label("Settings");
+        let reboot_button = Button::with_label("Restart");
+        let shutdown_button = Button::with_label("Shut down");
+        system.append(&settings_button);
+        system.append(&reboot_button);
+        system.append(&shutdown_button);
+
+        content.append(&system);
+
+        let settings_state = state.clone();
+        let settings_app = app.clone();
+        settings_button.connect_clicked(move |_| {
+            open_settings_window(&settings_app, &settings_state);
+        });
+
+        reboot_button.connect_clicked(move |_| {
+            request_power_action("reboot");
+        });
+
+        shutdown_button.connect_clicked(move |_| {
+            request_power_action("poweroff");
+        });
+
         root.append(&content);
         root.append(&taskbar);
         window.set_child(Some(&root));
@@ -327,6 +351,58 @@ fn launch_application(command: &str) -> std::io::Result<std::process::Child> {
     std::process::Command::new(program).args(parts).spawn()
 }
 
+
+fn open_settings_window(app: &Application, state: &ProteaState) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Protea Settings")
+        .default_width(560)
+        .default_height(420)
+        .build();
+
+    let root = Box::new(Orientation::Vertical, 14);
+    root.set_margin_top(24);
+    root.set_margin_bottom(24);
+    root.set_margin_start(24);
+    root.set_margin_end(24);
+
+    let title = Label::new(Some("Protea Settings"));
+    title.add_css_class("title-2");
+    root.append(&title);
+
+    root.append(&Label::new(Some(&format!(
+        "Identity: {}",
+        state.identity.as_ref().map(|i| i.display_name.as_str()).unwrap_or("Not configured")
+    ))));
+    root.append(&Label::new(Some(&format!(
+        "Device: {:?}  •  Tier: {:?}",
+        state.device.class, state.device.tier
+    ))));
+    root.append(&Label::new(Some(&format!(
+        "Mode: {:?}  •  Local settings: {}",
+        state.mode, state.settings.len()
+    ))));
+    root.append(&Label::new(Some(
+        "Protea keeps these settings locally until secure cross-device synchronization is enabled."
+    )));
+
+    let close = Button::with_label("Close");
+    let window_close = window.clone();
+    close.connect_clicked(move |_| window_close.close());
+    root.append(&close);
+
+    window.set_child(Some(&root));
+    window.present();
+}
+
+fn request_power_action(action: &str) {
+    let command = if action == "reboot" { "reboot" } else { "poweroff" };
+    match std::process::Command::new(command).status() {
+        Ok(status) if status.success() => {}
+        Ok(status) => eprintln!("Protea: {} exited with {}", command, status),
+        Err(error) => eprintln!("Protea: could not execute {}: {}", command, error),
+    }
+}
 
 fn apply_mode_policy(mode: ProteaMode) {
     let profile = match mode {
