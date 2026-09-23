@@ -5,4 +5,5 @@ edition = "2021"
 license = "TBD"
 
 [dependencies]
-protea-core = { path = "../..//core/protea-core" }
+protea-core = { path = "../../core/protea-core" }
+gtk = { package = "gtk4", version = "0.11.5" }
