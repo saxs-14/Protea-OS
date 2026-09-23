@@ -1,0 +1,6 @@
+config BR2_PACKAGE_PROTEA_CORE_CLI
+    bool "protea-core-cli"
+    depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
+    select BR2_PACKAGE_HOST_RUSTC
+    help
+      Protea shared-state command line service used by the base system.
