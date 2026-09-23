@@ -94,6 +94,7 @@ fn main() -> glib::ExitCode {
                 let mut current = load_or_initialize(&store_gaming);
                 current.set_mode(ProteaMode::Gaming);
                 let _ = store_gaming.save(&current);
+                apply_mode_policy(current.mode);
                 status_gaming.set_text(&format!(
                     "Device: {:?}  •  Tier: {:?}  •  Mode: Gaming",
                     current.device.class, current.device.tier
@@ -108,6 +109,7 @@ fn main() -> glib::ExitCode {
                 let mut current = load_or_initialize(&store_office);
                 current.set_mode(ProteaMode::Office);
                 let _ = store_office.save(&current);
+                apply_mode_policy(current.mode);
                 status_office.set_text(&format!(
                     "Device: {:?}  •  Tier: {:?}  •  Mode: Office",
                     current.device.class, current.device.tier
@@ -124,6 +126,7 @@ fn main() -> glib::ExitCode {
             println!("Protea application surface requested");
         });
 
+        apply_mode_policy(state.mode);
         apply_css();
         window.present();
     });
@@ -320,4 +323,20 @@ fn launch_application(command: &str) -> std::io::Result<std::process::Child> {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "empty command"));
     };
     std::process::Command::new(program).args(parts).spawn()
+}
+
+
+fn apply_mode_policy(mode: ProteaMode) {
+    let profile = match mode {
+        ProteaMode::Gaming => "performance",
+        ProteaMode::Office => "balanced",
+    };
+
+    let result = std::process::Command::new("powerprofilesctl")
+        .args(["set", profile])
+        .status();
+
+    if result.is_err() {
+        eprintln!("Protea: powerprofilesctl unavailable; keeping existing system power profile");
+    }
 }
