@@ -141,7 +141,7 @@ fn load_or_initialize(store: &StateStore) -> ProteaState {
 
     let mut state = ProteaState::new(DeviceProfile::new(
         DeviceClass::Pc,
-        HardwareTier::Minimum,
+        HardwareTier::from_memory_mb(detect_memory_mb()),
         detect_memory_mb(),
         0,
         true,
