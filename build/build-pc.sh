@@ -23,8 +23,11 @@ append_config "BR2_PACKAGE_WESTON" "y"
 append_config "BR2_PACKAGE_WESTON_DEFAULT_DRM" "y"
 append_config "BR2_PACKAGE_WESTON_SIMPLE_CLIENTS" "y"
 append_config "BR2_PACKAGE_MESA3D" "y"
-append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVM" "y"
+append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SOFTPIPE" "y"
+append_config "BR2_PACKAGE_MESA3D_OPENGL_EGL" "y"
+append_config "BR2_PACKAGE_MESA3D_GBM" "y"
 append_config "BR2_ROOTFS_OVERLAY" "\"${ROOT}/build/pc-overlay\""
+append_config "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES" "\"${ROOT}/build/qemu/protea-linux.fragment\""
 
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
