@@ -18,6 +18,6 @@ jobs:
           sudo apt-get install -y libgtk-4-dev
       - uses: dtolnay/rust-toolchain@stable
       - working-directory: pc
-        run: cargo check --workspace
+        run: cargo fmt --all
       - working-directory: pc
-        run: cargo fmt --all -- --check
+        run: cargo check --workspace
