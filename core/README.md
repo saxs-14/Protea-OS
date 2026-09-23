@@ -2,16 +2,27 @@
 
 This directory contains the shared software contracts and services used by Protea device shells.
 
-The first implementation is local-first and deliberately dependency-light.
+The first executable implementation is a standard-library-only Rust library plus a small CLI harness.
 
-Planned modules:
+Implemented now:
 
-- identity
-- settings
-- permissions
+- device class
+- hardware tier
 - device profile
+- local identity model
+- settings model
+- permission model
+- Gaming/Office mode state
+- aggregate Protea state
+- unit tests
+
+Not implemented yet:
+
+- durable persistence
+- IPC
+- encrypted storage
 - synchronization
+- authentication
+- OS service integration
 
-The shared core must not contain PC-specific UI code or phone-specific UI code.
-
-The first implementation target is a small Rust library with a command-line test harness. The command-line harness is an engineering tool, not the final user interface.
+Those are deliberately separate steps. The current code is real executable foundation code, not a UI mockup.
