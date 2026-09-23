@@ -547,8 +547,8 @@ fn open_settings_window(app: &Application) {
 }
 
 fn request_power_action(action: &str) {
-    let command = if action == "reboot" { "reboot" } else { "poweroff" };
-    let action_name = if action == "reboot" { "restart" } else { "shut down" };
+    let command = if action == "reboot" { "reboot" } else { "poweroff" }.to_string();
+    let action_name = if action == "reboot" { "restart" } else { "shut down" }.to_string();
 
     let dialog = gtk::MessageDialog::builder()
         .text(format!("Confirm {action_name}?"))
@@ -564,11 +564,11 @@ fn request_power_action(action: &str) {
         }
 
         let status = std::process::Command::new("loginctl")
-            .arg(if action == "reboot" { "reboot" } else { "poweroff" })
+.arg(&command)
             .status();
 
         if !matches!(status, Ok(status) if status.success()) {
-            match std::process::Command::new(command).status() {
+            match std::process::Command::new(&command).status() {
                 Ok(status) if status.success() => {}
                 Ok(status) => eprintln!("Protea: {} exited with {}", command, status),
                 Err(error) => eprintln!("Protea: could not execute {}: {}", command, error),
