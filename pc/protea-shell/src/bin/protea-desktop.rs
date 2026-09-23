@@ -278,7 +278,9 @@ fn open_app_launcher(app: &Application) {
             button.set_hexpand(true);
             let launch_command = command.clone();
             button.connect_clicked(move |_| {
-                let _ = launch_application(&launch_command);
+                if let Err(error) = launch_application(&launch_command) {
+                    eprintln!("Protea: could not launch {name}: {error}");
+                }
             });
             list.append(&button);
         }
@@ -289,8 +291,8 @@ fn open_app_launcher(app: &Application) {
     window.present();
 }
 
-fn discover_applications() -> Vec<(String, String)> {
-    let mut apps = BTreeMap::<String, String>::new();
+fn discover_applications() -> Vec<(String, Vec<String>)> {
+    let mut apps = BTreeMap::<String, Vec<String>>::new();
     let mut directories = vec![std::path::PathBuf::from("/usr/share/applications")];
 
     if let Ok(home) = std::env::var("HOME") {
@@ -306,48 +308,152 @@ fn discover_applications() -> Vec<(String, String)> {
             }
 
             let Ok(text) = std::fs::read_to_string(&path) else { continue };
-            let mut name = None;
-            let mut exec = None;
-            let mut is_application = false;
+            let Some((name, exec, hidden, no_display, try_exec, terminal)) =
+                parse_desktop_entry(&text)
+            else {
+                continue;
+            };
 
-            for line in text.lines() {
-                if line == "[Desktop Entry]" {
-                    is_application = true;
-                } else if is_application && line.starts_with("Name=") && name.is_none() {
-                    name = Some(line[5..].trim().to_string());
-                } else if is_application && line.starts_with("Exec=") && exec.is_none() {
-                    exec = Some(line[5..].trim().to_string());
-                } else if is_application && line.starts_with("[") {
-                    break;
-                }
+            if hidden || no_display || terminal || !desktop_entry_supported(&try_exec) {
+                continue;
             }
 
-            if let (Some(name), Some(exec)) = (name, exec) {
-                let command = sanitize_exec_command(&exec);
-                if !command.is_empty() {
-                    apps.entry(name).or_insert(command);
-                }
-            }
+            let Some(command) = parse_exec_command(&exec) else {
+                continue;
+            };
+
+            apps.entry(name).or_insert(command);
         }
     }
 
     apps.into_iter().collect()
 }
 
-fn sanitize_exec_command(exec: &str) -> String {
-    exec.split_whitespace()
-        .filter(|part| !part.starts_with('%'))
-        .map(|part| part.trim_matches('"'))
-        .collect::<Vec<_>>()
-        .join(" ")
+fn parse_desktop_entry(
+    text: &str,
+) -> Option<(String, String, bool, bool, Option<String>, bool)> {
+    let mut in_entry = false;
+    let mut name = None;
+    let mut exec = None;
+    let mut hidden = false;
+    let mut no_display = false;
+    let mut try_exec = None;
+    let mut terminal = false;
+
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line == "[Desktop Entry]" {
+            in_entry = true;
+            continue;
+        }
+        if !in_entry {
+            continue;
+        }
+        if line.starts_with('[') {
+            break;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+
+        match key {
+            "Type" if value != "Application" => return None,
+            "Name" if name.is_none() => name = Some(value.to_string()),
+            "Exec" if exec.is_none() => exec = Some(value.to_string()),
+            "Hidden" => hidden = value.eq_ignore_ascii_case("true"),
+            "NoDisplay" => no_display = value.eq_ignore_ascii_case("true"),
+            "TryExec" if !value.is_empty() => try_exec = Some(value.to_string()),
+            "Terminal" => terminal = value.eq_ignore_ascii_case("true"),
+            _ => {}
+        }
+    }
+
+    Some((name?, exec?, hidden, no_display, try_exec, terminal))
 }
 
-fn launch_application(command: &str) -> std::io::Result<std::process::Child> {
-    let mut parts = command.split_whitespace();
-    let Some(program) = parts.next() else {
+fn desktop_entry_supported(try_exec: &Option<String>) -> bool {
+    let Some(program) = try_exec else {
+        return true;
+    };
+
+    if program.contains('/') {
+        return std::path::Path::new(program).is_file();
+    }
+
+    std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).any(|dir| dir.join(program).is_file()))
+        .unwrap_or(false)
+}
+
+fn parse_exec_command(exec: &str) -> Option<Vec<String>> {
+    let tokens = shell_like_tokens(exec)?;
+    let mut command = Vec::with_capacity(tokens.len());
+
+    for token in tokens {
+        if token.starts_with('%') {
+            continue;
+        }
+
+        let cleaned = token.replace("%u", "").replace("%U", "").replace("%f", "").replace("%F", "");
+        if !cleaned.is_empty() {
+            command.push(cleaned);
+        }
+    }
+
+    if command.is_empty() {
+        None
+    } else {
+        Some(command)
+    }
+}
+
+fn shell_like_tokens(input: &str) -> Option<Vec<String>> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = input.chars().peekable();
+    let mut quote = None;
+
+    while let Some(ch) = chars.next() {
+        match quote {
+            Some(q) if ch == q => quote = None,
+            Some('"') => current.push(ch),
+            Some('\') => current.push(ch),
+            Some(_) => current.push(ch),
+            None if ch == '\' => {
+                let next = chars.next()?;
+                current.push(next);
+            }
+            None if ch == '"' || ch == '\'' => quote = Some(ch),
+            None if ch.is_whitespace() => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            None => current.push(ch),
+        }
+    }
+
+    if quote.is_some() {
+        return None;
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    Some(tokens)
+}
+
+fn launch_application(command: &[String]) -> std::io::Result<std::process::Child> {
+    let Some(program) = command.first() else {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "empty command"));
     };
-    std::process::Command::new(program).args(parts).spawn()
+
+    let mut process = std::process::Command::new(program);
+    if command.len() > 1 {
+        process.args(&command[1..]);
+    }
+    process.spawn()
 }
 
 
