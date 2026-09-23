@@ -35,6 +35,7 @@ append_config "BR2_TARGET_GRUB2_BOOT_PARTITION" "\"cd\""
 append_config "BR2_TARGET_GRUB2_BUILTIN_MODULES_PC" "boot linux iso9660 ext2 normal biosdisk"
 append_config "BR2_TARGET_ROOTFS_ISO9660_BOOT_MENU" "\"${ROOT}/build/qemu/grub.cfg\""
 append_config "BR2_ROOTFS_OVERLAY" "\"${ROOT}/build/pc-overlay\""
+append_config "BR2_ROOTFS_USERS_TABLES" "\"${ROOT}/build/protea-users-table.txt\""
 append_config "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES" "\"${ROOT}/build/qemu/protea-linux.fragment\""
 
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
