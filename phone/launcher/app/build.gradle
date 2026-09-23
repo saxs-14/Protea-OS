@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.protea.os.launcher'
+    compileSdk 37
+
+    defaultConfig {
+        applicationId 'org.protea.os.launcher'
+        minSdk 26
+        targetSdk 37
+        versionCode 1
+        versionName '0.1.0'
+    }
+}
