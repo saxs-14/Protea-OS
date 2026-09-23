@@ -1,0 +1,20 @@
+#!/bin/sh
+case "$1" in
+  start)
+    echo "Starting Protea network..."
+    if command -v ip >/dev/null 2>&1; then
+      ip link set eth0 up 2>/dev/null || true
+    fi
+    if command -v udhcpc >/dev/null 2>&1; then
+      udhcpc -i eth0 -q -n -t 5 -T 3 >/var/log/protea-network.log 2>&1 &
+    else
+      echo "Protea: DHCP client unavailable."
+    fi
+    ;;
+  stop)
+    if command -v ip >/dev/null 2>&1; then
+      ip link set eth0 down 2>/dev/null || true
+    fi
+    ;;
+esac
+exit 0
