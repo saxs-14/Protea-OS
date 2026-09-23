@@ -156,7 +156,7 @@ fn deserialize(data: &str) -> Result<ProteaState, StateStoreError> {
 }
 
 fn escape(value: &str) -> String {
-    value.replace('%', "%25").replace('|', "%7C").replace('\\n', "%0A")
+    value.replace('%', "%25").replace('|', "%7C").replace("\n", "%0A")
 }
 
 fn unescape(value: &str) -> String {
