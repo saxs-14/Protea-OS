@@ -1,0 +1,8 @@
+config BR2_PACKAGE_PROTEA_DESKTOP
+    bool "protea-desktop"
+    depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
+    depends on BR2_PACKAGE_LIBGTK4
+    depends on BR2_PACKAGE_LIBGTK4_WAYLAND
+    select BR2_PACKAGE_HOST_RUSTC
+    help
+      Protea GTK4 desktop shell built from the repository source.
