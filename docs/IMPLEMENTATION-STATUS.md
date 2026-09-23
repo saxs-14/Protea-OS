@@ -27,6 +27,7 @@ This document records what is actually implemented in the repository. It deliber
 - Taskbar/start surface foundation.
 - Settings window with local identity/device/mode information.
 - Restart and shutdown controls using the underlying Linux power commands.
+- PC image now creates a dedicated unprivileged `protea` desktop account and launches the graphical shell outside the root account.
 - QEMU virtio networking with BusyBox DHCP startup support.
 
 ### Phone launcher
