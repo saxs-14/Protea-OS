@@ -101,6 +101,7 @@ impl ModePolicy {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProteaState {
     pub identity: Option<ProteaIdentity>,
     pub settings: Settings,
@@ -114,6 +115,10 @@ impl ProteaState {
     }
     pub fn set_identity(&mut self, identity: ProteaIdentity) { self.identity = Some(identity); }
     pub fn set_mode(&mut self, mode: ProteaMode) { self.mode = mode; }
+
+    pub fn mode_policy(&self) -> ModePolicy {
+        ModePolicy::for_mode(self.mode)
+    }
 }
 
 #[cfg(test)]
