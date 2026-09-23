@@ -23,7 +23,9 @@ if command -v debugfs >/dev/null; then
   for path in /usr/bin/protea-core /usr/bin/protea-desktop /etc/init.d/S99protea; do
     debugfs -R "stat $path" "${IMAGES}/rootfs.ext2" 2>/dev/null | grep -q 'Inode:' || fail "rootfs.ext2 does not contain $path"
   done
-  ok "core, desktop and boot init files are present in rootfs"
+  debugfs -R "cat /etc/passwd" "${IMAGES}/rootfs.ext2" 2>/dev/null | grep -q '^protea:' || fail "rootfs.ext2 does not contain the unprivileged protea account"
+  debugfs -R "cat /etc/init.d/S99protea" "${IMAGES}/rootfs.ext2" 2>/dev/null | grep -q 'su -s /bin/sh protea' || fail "graphical session is not configured to drop privileges"
+  ok "core, desktop, boot init and unprivileged session configuration are present in rootfs"
 else
   echo "VALIDATION WARNING: debugfs unavailable; rootfs file-presence validation skipped"
 fi
