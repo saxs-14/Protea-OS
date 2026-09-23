@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.Protea" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#C1440E</item>
+        <item name="android:navigationBarColor">#17120F</item>
+        <item name="android:statusBarColor">#7A2E0E</item>
+    </style>
+</resources>
