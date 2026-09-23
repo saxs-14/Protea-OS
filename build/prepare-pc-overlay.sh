@@ -14,8 +14,20 @@ case "$1" in
     mkdir -p /var/lib/protea
     chmod 700 /var/lib/protea
     export PROTEA_STATE_FILE=/var/lib/protea/state
-    if [ -x /usr/bin/protea-core ]; then
-      /usr/bin/protea-core status || true
+
+    if [ ! -x /usr/bin/protea-core ]; then
+      echo "Protea validation error: /usr/bin/protea-core is missing."
+      exit 1
+    fi
+
+    if ! /usr/bin/protea-core status; then
+      echo "Protea validation error: core status failed."
+      exit 1
+    fi
+
+    if [ ! -s /var/lib/protea/state ]; then
+      echo "Protea validation error: persistent state was not created."
+      exit 1
     fi
 
     if [ -x /usr/bin/weston ] && [ -x /usr/bin/protea-desktop ] && [ -e /dev/dri/card0 ]; then
@@ -32,12 +44,14 @@ case "$1" in
       done
       if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
         /usr/bin/protea-desktop &
+        echo "PROTEA_GRAPHICS_OK"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
       fi
     else
       echo "Protea: graphical session unavailable; continuing with core services."
     fi
+
     touch /var/run/protea-boot-ok
     echo "PROTEA_BOOT_OK"
     ;;
