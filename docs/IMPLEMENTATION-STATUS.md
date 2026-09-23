@@ -28,7 +28,7 @@ This document records what is actually implemented in the repository. It deliber
 
 ### Phone launcher
 - Real Android Activity configured as a HOME/launcher application.
-- Android 17/API 37 build target.
+- Android API 36 build target in CI (the launcher is designed for newer Android/AOSP integration later).
 - Gaming/Office mode selection.
 - Local mode persistence using Android SharedPreferences.
 - Discovery of installed launcher applications through PackageManager.
@@ -40,6 +40,9 @@ This document records what is actually implemented in the repository. It deliber
 - Android debug-build automation.
 - Buildroot bootstrap/build scripts pinned to a reproducible LTS release.
 - QEMU-first PC validation plan.
+- Buildroot package for the Protea GTK4 desktop shell.
+- Wayland/Weston and Mesa software-rendering integration for the PC image.
+- QEMU virtio-GPU and DRM kernel configuration fragment.
 - Cross-device contract and architecture documentation.
 
 ## Not yet a finished operating system
@@ -48,7 +51,7 @@ The repository does **not** yet contain a complete installable Protea OS release
 
 The following still require implementation and/or real-world validation:
 
-1. Bootable Protea PC image with the Protea session integrated.
+1. Verified bootable Protea PC image with the Protea session integrated.
 2. Real graphical login/session startup.
 3. Wayland compositor/window-management integration.
 4. Full desktop shell: settings, notifications, networking, file manager, system tray, lock screen and shutdown/reboot controls.
@@ -74,7 +77,7 @@ Core contracts, local state, CI, initial PC shell and Android launcher exist.
 ### Phase 2 — Real PC system
 **Status: in progress**
 
-The repository now contains a Buildroot external tree for the Protea Rust core, a root filesystem init hook, and an automated QEMU build/boot workflow. The remaining work is to make the complete graphical Protea session boot automatically.
+The repository now contains a Buildroot external tree for the Protea Rust core and GTK4 desktop shell, a Weston/Wayland graphics stack, a root filesystem init hook, a QEMU DRM kernel fragment, and an automated QEMU build/boot workflow. CI still has to prove the current image builds and boots; after that, real display/input/session validation remains.
 
 ### Phase 3 — PC hardware adaptation
 **Status: in progress**
