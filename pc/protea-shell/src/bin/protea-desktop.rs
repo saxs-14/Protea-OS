@@ -555,7 +555,7 @@ fn request_power_action(action: &str) {
         .secondary_text("Any unsaved application data may be lost.")
         .buttons(gtk::ButtonsType::Cancel)
         .build();
-    dialog.add_button(action_name, gtk::ResponseType::Accept);
+    dialog.add_button(&action_name, gtk::ResponseType::Accept);
 
     dialog.connect_response(move |dialog, response| {
         dialog.close();
