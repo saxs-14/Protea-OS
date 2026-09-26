@@ -2,7 +2,7 @@
 
 The phone path now contains a real Android launcher project that can be built and installed independently while the full AOSP integration is developed.
 
-Android 17 is API level 37. The current launcher project targets API 37 and uses Android Gradle Plugin 8.9.0 or newer, matching the Android 17 SDK setup guidance.
+The current launcher project targets API 36 (compileSdk/targetSdk 36, minSdk 26), matching `phone/launcher/app/build.gradle` and the `Protea Phone` CI workflow. Android 17 (API level 37) is a future upgrade target once the AOSP integration below tracks that release.
 
 This launcher is an integration-stage component, not a claim that Protea is already an AOSP system image.
 
