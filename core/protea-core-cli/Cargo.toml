@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 license = "TBD"
 
+[[bin]]
+name = "protea-core"
+path = "src/main.rs"
+
 [dependencies]
 protea-core = { path = "../protea-core" }
