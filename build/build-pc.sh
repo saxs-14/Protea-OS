@@ -12,7 +12,11 @@ make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}
 append_config() {
   local key="$1"
   local value="$2"
-  grep -q "^${key}=" "${BUILD_DIR}/.config" || echo "${key}=${value}" >> "${BUILD_DIR}/.config"
+  # Remove any existing assignment or "is not set" line for this symbol so a
+  # stale/conflicting entry from the base defconfig can never shadow the
+  # value we are requesting here.
+  sed -i -E "/^${key}=|^# ${key} is not set\$/d" "${BUILD_DIR}/.config"
+  echo "${key}=${value}" >> "${BUILD_DIR}/.config"
 }
 
 append_config "BR2_PACKAGE_PROTEA_CORE_CLI" "y"
@@ -39,6 +43,11 @@ append_config "BR2_ROOTFS_USERS_TABLES" "\"${ROOT}/build/protea-users-table.txt\
 append_config "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES" "\"${ROOT}/build/qemu/protea-linux.fragment\""
 
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
+
+echo "--- Protea graphical stack config check (post-olddefconfig) ---"
+(grep -E "is not set|^BR2_PACKAGE_" "${BUILD_DIR}/.config" | grep -E "PROTEA_CORE_CLI|PROTEA_DESKTOP|LIBGTK4|WESTON|MESA3D") || true
+echo "-----------------------------------------------------------------"
+
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
 
 echo "Build completed."
