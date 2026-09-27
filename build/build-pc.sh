@@ -29,7 +29,7 @@ append_config "BR2_PACKAGE_WESTON" "y"
 append_config "BR2_PACKAGE_WESTON_DEFAULT_DRM" "y"
 append_config "BR2_PACKAGE_WESTON_SIMPLE_CLIENTS" "y"
 append_config "BR2_PACKAGE_MESA3D" "y"
-append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SOFTPIPE" "y"
+append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SWRAST" "y"
 append_config "BR2_PACKAGE_MESA3D_OPENGL_EGL" "y"
 append_config "BR2_PACKAGE_MESA3D_GBM" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660" "y"
@@ -45,11 +45,6 @@ append_config "BR2_ROOTFS_USERS_TABLES" "\"${ROOT}/build/protea-users-table.txt\
 append_config "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES" "\"${ROOT}/build/qemu/protea-linux.fragment\""
 
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
-
-echo "--- BEGIN FULL RESOLVED .config (post-olddefconfig) ---"
-cat "${BUILD_DIR}/.config"
-echo "--- END FULL RESOLVED .config ---"
-
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
 
 echo "Build completed."
