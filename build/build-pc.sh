@@ -44,22 +44,9 @@ append_config "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES" "\"${ROOT}/build/qemu/pro
 
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
 
-echo "--- Protea graphical stack config check (post-olddefconfig) ---"
-for sym in \
-  BR2_PACKAGE_MESA3D BR2_PACKAGE_WESTON BR2_PACKAGE_LIBGTK4 \
-  BR2_PACKAGE_LIBGTK4_WAYLAND BR2_PACKAGE_PROTEA_DESKTOP \
-  BR2_PACKAGE_PROTEA_CORE_CLI BR2_PACKAGE_HAS_LIBEGL \
-  BR2_PACKAGE_HAS_UDEV BR2_INSTALL_LIBSTDCPP BR2_STATIC_LIBS \
-  BR2_TOOLCHAIN_HAS_THREADS BR2_TOOLCHAIN_HAS_THREADS_NPTL \
-  BR2_TOOLCHAIN_HAS_SYNC_1 BR2_TOOLCHAIN_HAS_SYNC_4 \
-  BR2_TOOLCHAIN_GCC_AT_LEAST_8 BR2_USE_WCHAR \
-  BR2_TOOLCHAIN_BUILDROOT_GLIBC BR2_TOOLCHAIN_BUILDROOT_MUSL \
-  BR2_TOOLCHAIN_BUILDROOT_UCLIBC; do
-  grep -E "^${sym}=|^# ${sym} is not set" "${BUILD_DIR}/.config" || echo "${sym}: ABSENT FROM CONFIG (invisible)"
-done
-echo "--- full BR2_TOOLCHAIN_* dump ---"
-grep -E "^BR2_TOOLCHAIN|^# BR2_TOOLCHAIN" "${BUILD_DIR}/.config" || true
-echo "-----------------------------------------------------------------"
+echo "--- BEGIN FULL RESOLVED .config (post-olddefconfig) ---"
+cat "${BUILD_DIR}/.config"
+echo "--- END FULL RESOLVED .config ---"
 
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
 
