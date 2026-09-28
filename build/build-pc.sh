@@ -51,7 +51,27 @@ make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}
 echo "Disk usage before full build:"
 df -h / "${BUILD_DIR}" 2>/dev/null || true
 
+# The last two CI attempts exhausted the runner's entire disk (145G total,
+# 120G free going in) before the build finished, with no clean error - the
+# runner process itself was killed by ENOSPC. Sample disk usage per
+# directory throughout the build so we can see exactly what is growing and
+# when, instead of only knowing the disk was full after the fact.
+(
+  while true; do
+    sleep 90
+    echo "=== disk snapshot $(date -u +%H:%M:%S) ==="
+    df -h / 2>/dev/null
+    du -sh "${BUILD_DIR}"/build "${BUILD_DIR}"/host "${BUILD_DIR}"/target \
+      "${BUILD_DIR}"/images "${ROOT}/.cache" 2>/dev/null
+  done
+) &
+DISK_MONITOR_PID=$!
+trap 'kill "${DISK_MONITOR_PID}" 2>/dev/null || true' EXIT
+
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
+
+kill "${DISK_MONITOR_PID}" 2>/dev/null || true
+trap - EXIT
 
 echo "Build completed."
 echo "Images: ${BUILD_DIR}/images"
