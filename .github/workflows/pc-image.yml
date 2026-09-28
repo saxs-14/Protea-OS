@@ -24,6 +24,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free up disk space
+        run: |
+          echo "Disk usage before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL "${AGENT_TOOLSDIRECTORY:-}" \
+            /usr/local/.ghcup /opt/az /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /usr/local/share/boost \
+            2>/dev/null || true
+          sudo docker image prune -af 2>/dev/null || true
+          echo "Disk usage after cleanup:"
+          df -h /
+
       - name: Cache Buildroot source
         uses: actions/cache@v4
         with:
