@@ -10,7 +10,7 @@ Develop and test the Protea shell inside an existing Linux installation. This av
 
 After the shell and core are stable, Buildroot will produce a controlled Linux system image.
 
-Buildroot can generate a cross-compilation toolchain, root filesystem, Linux kernel image and bootloader for a target system. We will pin a tested release for reproducible builds.
+Buildroot generates the root filesystem, Linux kernel image and bootloader for a target system. The PC image uses Buildroot 2025.02.18's pinned Bootlin x86_64/glibc stable external toolchain instead of compiling a second toolchain from source; this reduces the image build's time and peak disk use on GitHub-hosted runners. The resolved Buildroot configuration and image validator check that this profile remains selected.
 
 ## First target
 
