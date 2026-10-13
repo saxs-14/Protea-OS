@@ -19,7 +19,9 @@ append_config() {
   echo "${key}=${value}" >> "${BUILD_DIR}/.config"
 }
 
-append_config "BR2_TOOLCHAIN_BUILDROOT_CXX" "y"
+append_config "BR2_TOOLCHAIN_EXTERNAL" "y"
+append_config "BR2_TOOLCHAIN_EXTERNAL_BOOTLIN" "y"
+append_config "BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_X86_64_GLIBC_STABLE" "y"
 append_config "BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV" "y"
 append_config "BR2_PACKAGE_PROTEA_CORE_CLI" "y"
 append_config "BR2_PACKAGE_PROTEA_DESKTOP" "y"
