@@ -32,6 +32,9 @@ fi
 
 grep -q 'BR2_PACKAGE_PROTEA_CORE_CLI=y' "${BUILD_DIR}/.config" || fail "core package is not enabled"
 grep -q 'BR2_PACKAGE_PROTEA_DESKTOP=y' "${BUILD_DIR}/.config" || fail "desktop package is not enabled"
+grep -q 'BR2_TOOLCHAIN_EXTERNAL=y' "${BUILD_DIR}/.config" || fail "external toolchain is not enabled"
+grep -q 'BR2_TOOLCHAIN_EXTERNAL_BOOTLIN=y' "${BUILD_DIR}/.config" || fail "Bootlin toolchain provider is not enabled"
+grep -q 'BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_X86_64_GLIBC_STABLE=y' "${BUILD_DIR}/.config" || fail "pinned x86_64 glibc toolchain profile is not enabled"
 grep -q 'BR2_TARGET_ROOTFS_ISO9660=y' "${BUILD_DIR}/.config" || fail "ISO output is not enabled"
 ok "Buildroot configuration contains required Protea targets"
 
