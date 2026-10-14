@@ -6,8 +6,11 @@ BUILD_DIR="${ROOT}/output/pc"
 BUILDROOT="$("${ROOT}/build/fetch-buildroot.sh")"
 
 mkdir -p "${BUILD_DIR}"
+# Clear stale Buildroot downloads before each CI run so an interrupted or
+# corrupted tarball cannot poison the next build with a mismatched hash.
+rm -rf "${ROOT}/.cache/dl" "${ROOT}/.cache/downloads" "${BUILD_DIR}/build" "${BUILD_DIR}/host" "${BUILD_DIR}/target"
 "${ROOT}/build/prepare-pc-overlay.sh"
-make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" qemu_x86_64_defconfig
+make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" BR2_DL_DIR="${ROOT}/.cache/dl" qemu_x86_64_defconfig
 
 append_config() {
   local key="$1"
@@ -48,7 +51,7 @@ append_config "BR2_ROOTFS_OVERLAY" "\"${ROOT}/build/pc-overlay\""
 append_config "BR2_ROOTFS_USERS_TABLES" "\"${ROOT}/build/protea-users-table.txt\""
 append_config "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES" "\"${ROOT}/build/qemu/protea-linux.fragment\""
 
-make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" olddefconfig
+make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" BR2_DL_DIR="${ROOT}/.cache/dl" olddefconfig
 
 echo "Disk usage before full build:"
 df -h / "${BUILD_DIR}" 2>/dev/null || true
@@ -70,7 +73,7 @@ df -h / "${BUILD_DIR}" 2>/dev/null || true
 DISK_MONITOR_PID=$!
 trap 'kill "${DISK_MONITOR_PID}" 2>/dev/null || true' EXIT
 
-make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}"
+make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" BR2_DL_DIR="${ROOT}/.cache/dl"
 
 kill "${DISK_MONITOR_PID}" 2>/dev/null || true
 trap - EXIT
