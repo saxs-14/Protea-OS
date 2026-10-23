@@ -20,3 +20,6 @@ tv/**/build/
 android/**/build/
 # Local state files
 **/protea-state
+# Vendored cargo crates
+**/vendor/
+**/.cargo/

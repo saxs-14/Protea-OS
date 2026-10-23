@@ -6,10 +6,27 @@ BUILD_DIR="${ROOT}/output/pc"
 BUILDROOT="$("${ROOT}/build/fetch-buildroot.sh")"
 
 mkdir -p "${BUILD_DIR}"
-# Clear stale Buildroot downloads before each CI run so an interrupted or
-# corrupted tarball cannot poison the next build with a mismatched hash.
-rm -rf "${ROOT}/.cache/dl" "${ROOT}/.cache/downloads" "${BUILD_DIR}/build" "${BUILD_DIR}/host" "${BUILD_DIR}/target"
+rm -rf "${BUILD_DIR}/build" "${BUILD_DIR}/host" "${BUILD_DIR}/target"
 "${ROOT}/build/prepare-pc-overlay.sh"
+
+# Pre-vendor Cargo dependencies for offline Buildroot package builds
+if command -v cargo >/dev/null 2>&1; then
+  echo "Vendoring Cargo dependencies for protea-desktop..."
+  (
+    cd "${ROOT}/pc"
+    mkdir -p .cargo protea-shell/.cargo
+    cp -f Cargo.lock protea-shell/Cargo.lock 2>/dev/null || true
+    cargo vendor vendor > .cargo/config.toml
+    cat > protea-shell/.cargo/config.toml <<'EOF'
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "../vendor"
+EOF
+  )
+fi
+
 make -C "${BUILDROOT}" BR2_EXTERNAL="${ROOT}/build/br2-external" O="${BUILD_DIR}" BR2_DL_DIR="${ROOT}/.cache/dl" qemu_x86_64_defconfig
 
 append_config() {
