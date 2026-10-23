@@ -2,7 +2,7 @@ name: Protea PC Image
 
 on:
   push:
-    branches: [main]
+    branches: [main, "fix/**"]
     paths:
       - "build/**"
       - "core/**"
@@ -12,6 +12,7 @@ on:
     paths:
       - "build/**"
       - ".github/workflows/pc-image.yml"
+  workflow_dispatch:
 
 concurrency:
   group: protea-pc-image-${{ github.ref }}
