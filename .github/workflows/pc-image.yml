@@ -107,6 +107,16 @@ jobs:
             exit 1
           fi
 
+      - name: Upload built images
+        uses: actions/upload-artifact@v4
+        with:
+          name: protea-pc-images
+          path: |
+            output/pc/images/rootfs.iso9660
+            output/pc/images/bzImage
+            output/pc/images/rootfs.ext2
+          compression-level: 0
+
       - name: Upload QEMU boot log
         if: always()
         uses: actions/upload-artifact@v4
