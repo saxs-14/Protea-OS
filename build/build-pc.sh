@@ -59,6 +59,8 @@ append_config "BR2_PACKAGE_CAIRO_ZLIB" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660_GRUB2" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660_INITRD" "y"
+# GTK4 + Weston + Mesa push the rootfs well past the 60M default; use 512M
+append_config "BR2_TARGET_ROOTFS_EXT2_SIZE" "\"512M\""
 append_config "BR2_TARGET_GRUB2" "y"
 append_config "BR2_TARGET_GRUB2_I386_PC" "y"
 append_config "BR2_TARGET_GRUB2_BOOT_PARTITION" "\"cd\""
