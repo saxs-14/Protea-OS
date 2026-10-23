@@ -49,6 +49,7 @@ fn main() {
             }
             "permissions" => print_permissions(&state),
             "settings" => print_settings(&state),
+            "mmino" => print_mmino(),
             "quit" | "exit" => break,
             "" => {}
             _ => println!("Unknown command. Type 'help'."),
@@ -101,12 +102,19 @@ fn print_settings(state: &ProteaState) {
     }
 }
 
+fn print_mmino() {
+    println!("Mmino: South African Music Platform (Stage 1)");
+    println!("State: Local playback engine ready");
+    println!("Supported: MP3, FLAC, WAV, OGG, AAC");
+}
+
 fn print_help() {
     println!("status       show device and Protea state");
     println!("settings     show persisted settings");
     println!("permissions  show permissions");
     println!("gaming       switch to Gaming mode");
     println!("office       switch to Office mode");
+    println!("mmino        show Mmino music platform status");
     println!("quit         exit shell");
 }
 

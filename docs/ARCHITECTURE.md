@@ -1,5 +1,9 @@
 # Protea OS Architecture
 
+## Current status snapshot
+
+The repository has a working shared-core foundation and a partial PC-shell implementation, but it is not yet a fully proven bootable operating system. The current architecture remains intentionally layered: local-first shared contracts at the core, a Linux PC integration layer, and a deferred phone/watch/TV expansion path.
+
 ## 1. Purpose
 
 Protea OS is a cross-device operating experience built on proven foundations.

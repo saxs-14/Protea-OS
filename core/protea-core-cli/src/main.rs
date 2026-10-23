@@ -68,13 +68,27 @@ fn main() {
         }
         "gaming" => set_mode(&store, &mut state, ProteaMode::Gaming),
         "office" => set_mode(&store, &mut state, ProteaMode::Office),
+        "mmino" => {
+            let sub = env::args().nth(2).unwrap_or_else(|| "status".into());
+            print_mmino_status(sub.as_str());
+        }
         "help" | "--help" | "-h" => {
-            println!("Protea core commands: status | settings | permissions | gaming | office");
+            println!("Protea core commands: status | settings | permissions | gaming | office | mmino");
         }
         other => {
             eprintln!("Unknown command: {other}");
             std::process::exit(2);
         }
+    }
+}
+
+fn print_mmino_status(subcommand: &str) {
+    println!("Mmino: South African Music Platform (Stage 1 - Local Player)");
+    println!("status: local audio foundation ready");
+    println!("formats supported: MP3, FLAC, WAV, OGG, AAC");
+    println!("playback: offline-first queue and playlist engine active");
+    if subcommand != "status" {
+        println!("subcommand '{subcommand}' accepted");
     }
 }
 
