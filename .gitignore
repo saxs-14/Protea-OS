@@ -11,3 +11,12 @@ buildroot-*/
 .env
 .env.*
 !.env.example
+.gradle/
+**/.gradle/
+# Ignore Gradle/Android build output dirs (not the top-level build/ scripts)
+phone/**/build/
+watch/**/build/
+tv/**/build/
+android/**/build/
+# Local state files
+**/protea-state

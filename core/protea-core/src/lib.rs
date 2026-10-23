@@ -5,6 +5,9 @@
 mod persistence;
 pub use persistence::{StateStore, StateStoreError};
 
+pub mod mmino;
+pub use mmino::{AudioFormat, AudioTrack, LocalLibrary, PlaybackQueue, PlaybackState, Playlist, RepeatMode};
+
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

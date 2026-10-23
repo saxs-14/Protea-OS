@@ -76,3 +76,54 @@ exit 0
 EOF
 
 chmod 0755 "${OVERLAY}/etc/init.d/S99protea"
+
+APPS_DIR="${OVERLAY}/usr/share/applications"
+mkdir -p "${APPS_DIR}"
+
+cat > "${APPS_DIR}/mmino.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Mmino
+GenericName=Music Player
+Comment=South African local music player for Protea OS
+Exec=protea-desktop --app mmino
+Icon=audio-player
+Categories=AudioVideo;Audio;Player;
+Terminal=false
+EOF
+
+cat > "${APPS_DIR}/ditlhophiso.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Ditlhophiso
+GenericName=Settings
+Comment=System settings and preferences for Protea OS
+Exec=protea-desktop --app settings
+Icon=preferences-system
+Categories=Settings;System;
+Terminal=false
+EOF
+
+cat > "${APPS_DIR}/ngwala.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Ngwala
+GenericName=Notes
+Comment=Fast offline notes and checklists
+Exec=protea-desktop --app notes
+Icon=accessories-text-editor
+Categories=Office;Utility;
+Terminal=false
+EOF
+
+cat > "${APPS_DIR}/bala.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Bala
+GenericName=Calculator
+Comment=System calculator for Protea OS
+Exec=protea-desktop --app calculator
+Icon=accessories-calculator
+Categories=Utility;Calculator;
+Terminal=false
+EOF

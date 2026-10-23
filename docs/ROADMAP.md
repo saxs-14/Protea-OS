@@ -65,6 +65,8 @@ Mode changes must remain safe and reversible.
 - [ ] Recovery environment
 - [ ] Installation documentation
 
+Current status: BROKEN/UNVERIFIED. The repository contains the build scripts and package definitions, but the end-to-end Buildroot image path is not yet proven on this machine and the Workflow history shows repeated image failures culminating in runner disk pressure.
+
 ## Phase 5 — Low-end hardware validation
 
 At minimum, test on:
