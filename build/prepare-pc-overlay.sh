@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVERLAY="${ROOT}/build/pc-overlay"
 
+mkdir -p "${OVERLAY}"
+ln -sf sbin/init "${OVERLAY}/init"
+
 mkdir -p "${OVERLAY}/etc/init.d"
 
 cat > "${OVERLAY}/etc/init.d/S99protea" <<'EOF'
