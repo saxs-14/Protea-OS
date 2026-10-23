@@ -252,6 +252,7 @@ impl PlaybackQueue {
         self.position_secs = 0;
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&AudioTrack> {
         if self.tracks.is_empty() {
             return None;
