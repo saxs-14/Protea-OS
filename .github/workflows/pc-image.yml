@@ -91,6 +91,7 @@ jobs:
           timeout 45s qemu-system-x86_64 \
             -m 1024 -smp 2 \
             -cdrom output/pc/images/rootfs.iso9660 \
+            -boot order=d \
             -device virtio-gpu-pci \
             -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
             -nographic > qemu-iso-boot.log 2>&1 || code=$?
