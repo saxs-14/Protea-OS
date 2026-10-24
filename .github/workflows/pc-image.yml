@@ -62,7 +62,7 @@ jobs:
           test -s output/pc/images/rootfs.ext2
           test -s output/pc/images/rootfs.iso9660
           file output/pc/images/bzImage output/pc/images/rootfs.ext2 output/pc/images/rootfs.iso9660
-          xorriso -indev output/pc/images/rootfs.iso9660 -find / -type f -print 2>&1 | tee iso-file-list.txt
+          xorriso -indev output/pc/images/rootfs.iso9660 -find / -type f 2>&1 | tee iso-file-list.txt
           grep -E '(^|/)bzImage$' iso-file-list.txt
           grep -E '(rootfs.*cpio|initrd)' iso-file-list.txt
 
