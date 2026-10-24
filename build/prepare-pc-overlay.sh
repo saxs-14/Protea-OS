@@ -48,7 +48,7 @@ case "$1" in
       chmod 700 "$PROTEA_RUNTIME_DIR"
       export XDG_RUNTIME_DIR="$PROTEA_RUNTIME_DIR"
       export WAYLAND_DISPLAY=wayland-0
-      weston --backend=drm-backend.so --tty=1 --log=/var/log/weston.log &
+      weston --backend=drm-backend.so --log=/var/log/weston.log &
       i=0
       while [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && [ "$i" -lt 50 ]; do
         sleep 0.1
