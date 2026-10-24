@@ -50,7 +50,7 @@ case "$1" in
       export WAYLAND_DISPLAY=wayland-0
       weston --backend=drm-backend.so --log=/var/log/weston.log &
       i=0
-      while [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && [ "$i" -lt 50 ]; do
+      while [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && [ "$i" -lt 300 ]; do
         sleep 0.1
         i=$((i + 1))
       done

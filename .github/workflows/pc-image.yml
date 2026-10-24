@@ -72,7 +72,7 @@ jobs:
       - name: Boot PC image in QEMU
         run: |
           set +e
-          timeout 45s build/qemu/run-console.sh > qemu-boot.log 2>&1
+          timeout 90s build/qemu/run-console.sh > qemu-boot.log 2>&1
           code=$?
           set -e
           cat qemu-boot.log
@@ -98,8 +98,13 @@ jobs:
       - name: Boot installation ISO in QEMU
         run: |
           set +e
-          timeout 45s qemu-system-x86_64 \
+          KVM_FLAGS=()
+          if [ -w /dev/kvm ]; then
+            KVM_FLAGS=(-enable-kvm -cpu host)
+          fi
+          timeout 90s qemu-system-x86_64 \
             -m 1024 -smp 2 \
+            "${KVM_FLAGS[@]}" \
             -cdrom output/pc/images/rootfs.iso9660 \
             -boot order=d \
             -device virtio-gpu-pci \
