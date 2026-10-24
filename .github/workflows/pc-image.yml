@@ -78,6 +78,12 @@ jobs:
           cat qemu-boot.log
           if grep -q "PROTEA_BOOT_OK" qemu-boot.log; then
             echo "QEMU PC image boot reached Protea system readiness."
+            if grep -q "PROTEA_GRAPHICS_OK" qemu-boot.log; then
+              echo "Protea graphical session (Weston + protea-desktop) started."
+            else
+              echo "Boot succeeded but the graphical session did not start - see qemu-boot.log."
+              exit 1
+            fi
           elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|cannot mount root" qemu-boot.log; then
             echo "PC image kernel/root filesystem failure detected."
             exit 1

@@ -59,6 +59,9 @@ case "$1" in
         echo "PROTEA_GRAPHICS_OK"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
+        echo "---- weston.log ----"
+        cat /var/log/weston.log 2>&1 || echo "(no weston.log)"
+        echo "---------------------"
       fi
     else
       echo "Protea: graphical session unavailable; continuing with core services."
