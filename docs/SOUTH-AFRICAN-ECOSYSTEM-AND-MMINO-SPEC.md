@@ -3,7 +3,7 @@
 **Document type:** Product vision and future implementation specification
 **Status:** Proposed planning document. Listed apps and features are not claimed to be implemented.
 **Repository:** https://github.com/saxs-14/Protea-OS
-**Audience:** Future contributors and Claude Code
+**Audience:** Future contributors
 
 ## 1. Purpose
 

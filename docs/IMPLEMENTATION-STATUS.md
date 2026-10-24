@@ -58,9 +58,9 @@ The repository does **not** yet contain a complete installable Protea OS release
 
 The following still require implementation and/or real-world validation:
 
-1. Verified bootable Protea PC image with the Protea session integrated; automated QEMU/ISO validation is being executed; the workflow now serializes image builds so only the current main revision consumes the build runner.
-2. Real graphical login/session startup.
-3. Wayland compositor/window-management integration.
+1. Real graphical session use on physical PC hardware (QEMU boot of both the ext2 image and the installation ISO is now verified in CI; physical hardware is not).
+2. Real graphical login/session startup beyond the automated readiness marker - interactive use of the desktop has not been observed by a human.
+3. Deeper Wayland compositor/window-management integration beyond the current Weston/GTK4 session.
 4. Full desktop shell: settings, notifications, networking, file manager, system tray, lock screen and shutdown/reboot controls.
 5. Hardware-specific GPU acceleration and graphics testing.
 6. Deeper Gaming/Office performance controls beyond power-profile selection.
@@ -82,9 +82,9 @@ The following still require implementation and/or real-world validation:
 Core contracts, local state, CI, initial PC shell and Android launcher exist.
 
 ### Phase 2 — Real PC system
-**Status: in progress**
+**Status: implemented (QEMU-validated)**
 
-The repository now contains a Buildroot external tree for the Protea Rust core and GTK4 desktop shell, a Weston/Wayland graphics stack, a root filesystem init hook, a QEMU DRM kernel fragment, and an automated QEMU build/boot workflow. CI still has to prove the current image builds and boots; after that, real display/input/session validation remains.
+The Buildroot external tree for the Protea Rust core and GTK4 desktop shell, the Weston/Wayland graphics stack, the root filesystem init hook, the QEMU DRM kernel fragment, and the automated QEMU build/boot workflow all exist and are proven by CI: the image builds, the artifact and rootfs content checks pass, and QEMU boots both the ext2/kernel image and the installation ISO through to the `PROTEA_BOOT_OK` readiness marker. This proves the boot chain and automated checks in QEMU specifically - it does not yet prove behavior on physical hardware (see Phase 5) or validate real display/input interaction beyond the readiness marker.
 
 ### Phase 3 — PC hardware adaptation
 **Status: in progress**
