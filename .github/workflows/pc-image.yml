@@ -47,7 +47,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex cpio file rsync unzip wget curl             python3 libncurses-dev qemu-system-x86
+          sudo apt-get install -y build-essential bc bison flex cpio file rsync unzip wget curl python3 libncurses-dev qemu-system-x86 xorriso e2fsprogs
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -62,67 +62,85 @@ jobs:
           test -s output/pc/images/rootfs.ext2
           test -s output/pc/images/rootfs.iso9660
           file output/pc/images/bzImage output/pc/images/rootfs.ext2 output/pc/images/rootfs.iso9660
+          xorriso -indev output/pc/images/rootfs.iso9660 -find / -type f 2>&1 | tee iso-file-list.txt
+          grep -E 'bzImage' iso-file-list.txt
+          grep -E '(rootfs.*cpio|initrd)' iso-file-list.txt
 
       - name: Validate built PC image
-        run: |
-          sudo apt-get install -y e2fsprogs
-          ./build/validate-pc-image.sh
+        run: ./build/validate-pc-image.sh
 
-      - name: Boot image in QEMU
+      - name: Boot PC image in QEMU
         run: |
-          chmod +x build/qemu/run-console.sh
-          timeout 45s build/qemu/run-console.sh > qemu-boot.log 2>&1 || code=$?
-          code="${code:-0}"
+          set +e
+          timeout 45s build/qemu/run-console.sh > qemu-boot.log 2>&1
+          code=$?
+          set -e
           cat qemu-boot.log
           if grep -q "PROTEA_BOOT_OK" qemu-boot.log; then
-            echo "QEMU boot reached Protea system readiness."
-          elif grep -q "Welcome to Buildroot" qemu-boot.log; then
-            echo "QEMU boot reached the Buildroot userspace, but Protea readiness marker was not observed."
+            echo "QEMU PC image boot reached Protea system readiness."
+          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|cannot mount root" qemu-boot.log; then
+            echo "PC image kernel/root filesystem failure detected."
             exit 1
           elif [ "$code" -eq 124 ]; then
-            echo "QEMU did not exit before timeout; inspect the boot log."
+            echo "PC image boot timed out before readiness."
             exit 1
           else
-            echo "QEMU boot did not reach the expected userspace marker."
+            echo "PC image boot did not reach the expected readiness marker (exit $code)."
             exit 1
           fi
 
       - name: Boot installation ISO in QEMU
         run: |
+          set +e
           timeout 45s qemu-system-x86_64 \
             -m 1024 -smp 2 \
             -cdrom output/pc/images/rootfs.iso9660 \
             -boot order=d \
             -device virtio-gpu-pci \
             -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
-            -nographic > qemu-iso-boot.log 2>&1 || code=$?
-          code="${code:-0}"
+            -nographic > qemu-iso-boot.log 2>&1
+          code=$?
+          set -e
           cat qemu-iso-boot.log
           if grep -q "PROTEA_BOOT_OK" qemu-iso-boot.log; then
             echo "Protea ISO boot reached system readiness."
+          elif grep -Eqi "file .* not found|grub rescue|grub>" qemu-iso-boot.log; then
+            echo "ISO bootloader/configuration failure detected."
+            exit 1
+          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|Cannot open root device" qemu-iso-boot.log; then
+            echo "ISO kernel/root filesystem failure detected."
+            exit 1
           elif [ "$code" -eq 124 ]; then
             echo "Protea ISO did not reach system readiness before timeout."
             exit 1
           else
-            echo "Protea ISO boot failed."
+            echo "Protea ISO boot failed before readiness (exit $code)."
             exit 1
           fi
 
-      - name: Upload built images
+      # Upload generated images even when a boot test fails, so the failed
+      # ISO can be downloaded and inspected. Missing files are not hidden.
+      - name: Upload built images for diagnosis
+        if: ${{ always() && steps.build.outcome != 'failure' && (hashFiles('output/pc/images/rootfs.iso9660') != '' || hashFiles('output/pc/images/rootfs.ext2') != '') }}
         uses: actions/upload-artifact@v4
         with:
-          name: protea-pc-images
+          name: protea-pc-images-${{ github.run_number }}
           path: |
             output/pc/images/rootfs.iso9660
             output/pc/images/bzImage
             output/pc/images/rootfs.ext2
+          if-no-files-found: warn
           compression-level: 0
+          retention-days: 14
 
-      - name: Upload QEMU boot log
+      - name: Upload QEMU and ISO diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: protea-qemu-boot-log
+          name: protea-boot-diagnostics-${{ github.run_number }}
           path: |
             qemu-boot.log
             qemu-iso-boot.log
+            iso-file-list.txt
+          if-no-files-found: warn
+          retention-days: 14
