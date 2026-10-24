@@ -249,11 +249,49 @@ fn detect_memory_mb() -> u64 {
         .unwrap_or(0)
 }
 
+const WALLPAPER_DIR: &str = "/usr/share/protea/wallpapers";
+
+/// Picks one bundled wallpaper (licensed South African heritage photography
+/// plus Protea branding art - see assets/wallpapers/CREDITS.md) using the
+/// current time as a cheap, dependency-free source of variety. Returns None
+/// when the directory is absent, e.g. running the shell outside the built
+/// Protea image during development.
+fn select_wallpaper() -> Option<std::path::PathBuf> {
+    let mut entries: Vec<_> = std::fs::read_dir(WALLPAPER_DIR)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            matches!(
+                path.extension().and_then(|ext| ext.to_str()),
+                Some("jpg") | Some("jpeg") | Some("png")
+            )
+        })
+        .collect();
+    entries.sort();
+    if entries.is_empty() {
+        return None;
+    }
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let index = (nanos as usize) % entries.len();
+    Some(entries.remove(index))
+}
+
 fn apply_css() {
     let provider = gtk::CssProvider::new();
-    provider.load_from_data(
-        "window { background: #17120f; } .title-1 { font-weight: 800; font-size: 34px; }",
-    );
+    let background = match select_wallpaper() {
+        Some(path) => format!(
+            "window {{ background-image: url(\"{}\"); background-size: cover; background-position: center; }}",
+            path.display()
+        ),
+        None => "window { background: #17120f; }".to_string(),
+    };
+    provider.load_from_data(&format!(
+        "{background} .title-1 {{ font-weight: 800; font-size: 34px; }}"
+    ));
     if let Some(display) = gtk::gdk::Display::default() {
         gtk::style_context_add_provider_for_display(
             &display,
