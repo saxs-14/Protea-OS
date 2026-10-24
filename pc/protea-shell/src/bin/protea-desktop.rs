@@ -1,7 +1,21 @@
 use gtk::prelude::*;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
-use gtk::{glib, Application, ApplicationWindow, Box, Button, Label, Orientation, Separator, ToggleButton};
+use std::rc::Rc;
+use gtk::{glib, Application, ApplicationWindow, Box, Button, Label, Orientation, SearchEntry, Separator, ToggleButton};
 use protea_core::{DeviceClass, DeviceProfile, HardwareTier, Permission, ProteaIdentity, ProteaMode, ProteaState, StateStore};
+
+/// A spawned application tracked in the taskbar. Protea has no compositor-level
+/// window management yet (see docs/IMPLEMENTATION-STATUS.md), so a taskbar entry
+/// can report whether its app is still running and let the user end it, but it
+/// cannot focus/restore the app's actual window - that needs real Wayland
+/// shell-protocol integration with Weston, which does not exist yet.
+struct RunningApp {
+    child: std::process::Child,
+    button: Button,
+}
+
+type RunningApps = Rc<RefCell<Vec<RunningApp>>>;
 
 const APP_ID: &str = "org.protea.os.desktop";
 
@@ -80,9 +94,39 @@ fn main() -> glib::ExitCode {
         taskbar.set_margin_bottom(8);
 
         let start_menu = Button::with_label("Protea");
-        let clock = Label::new(Some("Protea Desktop"));
         taskbar.append(&start_menu);
-        taskbar.append(&clock);
+
+        // Real running-app entries, Windows-taskbar style: one button per
+        // spawned app, removed automatically once that process exits.
+        let running_box = Box::new(Orientation::Horizontal, 6);
+        running_box.set_hexpand(true);
+        taskbar.append(&running_box);
+        let running_apps: RunningApps = Rc::new(RefCell::new(Vec::new()));
+
+        {
+            let running_apps = running_apps.clone();
+            glib::timeout_add_seconds_local(2, move || {
+                let mut apps = running_apps.borrow_mut();
+                apps.retain_mut(|app| match app.child.try_wait() {
+                    Ok(Some(_status)) => {
+                        app.button.unparent();
+                        false
+                    }
+                    _ => true,
+                });
+                glib::ControlFlow::Continue
+            });
+        }
+
+        let tray = Box::new(Orientation::Horizontal, 10);
+        let tray_mode = Label::new(Some(&format!("{:?}", state.mode)));
+        tray.append(&tray_mode);
+        if state.device.has_battery {
+            tray.append(&Label::new(Some("Battery")));
+        }
+        let clock = Label::new(Some("Protea Desktop"));
+        tray.append(&clock);
+        taskbar.append(&tray);
 
         let system = Box::new(Orientation::Horizontal, 8);
         let settings_button = Button::with_label("Settings");
@@ -142,13 +186,17 @@ fn main() -> glib::ExitCode {
         });
 
         let start_menu_app = app.clone();
+        let start_menu_running = running_apps.clone();
+        let start_menu_running_box = running_box.clone();
         start_menu.connect_clicked(move |_| {
-            open_app_launcher(&start_menu_app);
+            open_app_launcher(&start_menu_app, start_menu_running.clone(), &start_menu_running_box);
         });
 
         let start_app = app.clone();
+        let start_running = running_apps.clone();
+        let start_running_box = running_box.clone();
         start.connect_clicked(move |_| {
-            open_app_launcher(&start_app);
+            open_app_launcher(&start_app, start_running.clone(), &start_running_box);
         });
 
         apply_mode_policy(state.mode);
@@ -247,10 +295,10 @@ fn detect_battery() -> bool {
 }
 
 
-fn open_app_launcher(app: &Application) {
+fn open_app_launcher(app: &Application, running_apps: RunningApps, running_box: &Box) {
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("Protea Applications")
+        .title("Protea Start Menu")
         .default_width(520)
         .default_height(620)
         .build();
@@ -261,9 +309,13 @@ fn open_app_launcher(app: &Application) {
     root.set_margin_start(20);
     root.set_margin_end(20);
 
-    let title = Label::new(Some("Applications"));
+    let title = Label::new(Some("Protea"));
     title.add_css_class("title-2");
     root.append(&title);
+
+    let search = SearchEntry::new();
+    search.set_placeholder_text(Some("Search applications"));
+    root.append(&search);
 
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::None);
@@ -277,18 +329,64 @@ fn open_app_launcher(app: &Application) {
             button.set_halign(gtk::Align::Fill);
             button.set_hexpand(true);
             let launch_command = command.clone();
+            let launch_name = name.clone();
+            let running_apps = running_apps.clone();
+            let running_box = running_box.clone();
+            let window_for_launch = window.clone();
             button.connect_clicked(move |_| {
-                if let Err(error) = launch_application(&launch_command) {
-                    eprintln!("Protea: could not launch {name}: {error}");
+                match launch_application(&launch_command) {
+                    Ok(child) => {
+                        spawn_tracked(child, &launch_name, running_apps.clone(), &running_box);
+                        window_for_launch.close();
+                    }
+                    Err(error) => {
+                        eprintln!("Protea: could not launch {launch_name}: {error}");
+                    }
                 }
             });
-            list.append(&button);
+
+            let row = gtk::ListBoxRow::new();
+            row.set_child(Some(&button));
+            row.set_widget_name(&name.to_ascii_lowercase());
+            list.append(&row);
         }
     }
+
+    let list_for_filter = list.clone();
+    search.connect_search_changed(move |entry| {
+        let query = entry.text().to_string().to_ascii_lowercase();
+        list_for_filter.set_filter_func(move |row| {
+            query.is_empty() || row.widget_name().to_ascii_lowercase().contains(&query)
+        });
+    });
 
     root.append(&list);
     window.set_child(Some(&root));
     window.present();
+    search.grab_focus();
+}
+
+/// Adds a taskbar entry for a just-launched app. Protea cannot focus or
+/// restore the app's real window yet (no compositor shell-protocol
+/// integration), so the entry's one honest action is ending the process.
+fn spawn_tracked(child: std::process::Child, name: &str, running_apps: RunningApps, running_box: &Box) {
+    let kill_button = Button::with_label(name);
+    kill_button.set_tooltip_text(Some("Running - click to end this application"));
+    running_box.append(&kill_button);
+    running_apps.borrow_mut().push(RunningApp { child, button: kill_button.clone() });
+
+    let running_apps_for_kill = running_apps.clone();
+    let name_for_kill = name.to_string();
+    kill_button.connect_clicked(move |button| {
+        let mut apps = running_apps_for_kill.borrow_mut();
+        if let Some(pos) = apps.iter().position(|running| &running.button == button) {
+            let mut running = apps.remove(pos);
+            if let Err(error) = running.child.kill() {
+                eprintln!("Protea: could not stop {name_for_kill}: {error}");
+            }
+            running.button.unparent();
+        }
+    });
 }
 
 fn discover_applications() -> Vec<(String, Vec<String>)> {
