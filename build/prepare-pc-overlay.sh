@@ -47,16 +47,32 @@ case "$1" in
       chown protea:protea "$PROTEA_RUNTIME_DIR"
       chmod 700 "$PROTEA_RUNTIME_DIR"
       export XDG_RUNTIME_DIR="$PROTEA_RUNTIME_DIR"
-      export WAYLAND_DISPLAY=wayland-0
       weston --backend=drm-backend.so --log=/var/log/weston.log &
+      # Do not assume the compositor binds "wayland-0": libseat's embedded
+      # seatd launcher (used here since there is no systemd-logind or
+      # standalone seatd) forks weston internally, and the resulting socket
+      # has been observed to land on "wayland-1" instead. Detect whichever
+      # wayland-<N> socket actually appears rather than waiting on a fixed name.
       i=0
-      while [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && [ "$i" -lt 300 ]; do
+      WAYLAND_DISPLAY=""
+      while [ -z "$WAYLAND_DISPLAY" ] && [ "$i" -lt 300 ]; do
+        for candidate in "$XDG_RUNTIME_DIR"/wayland-*; do
+          case "$candidate" in
+            *.lock) continue ;;
+          esac
+          if [ -S "$candidate" ]; then
+            WAYLAND_DISPLAY="${candidate##*/}"
+            break
+          fi
+        done
+        [ -n "$WAYLAND_DISPLAY" ] && break
         sleep 0.1
         i=$((i + 1))
       done
-      if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+      if [ -n "$WAYLAND_DISPLAY" ]; then
+        export WAYLAND_DISPLAY
         su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' /usr/bin/protea-desktop" &
-        echo "PROTEA_GRAPHICS_OK"
+        echo "PROTEA_GRAPHICS_OK (wayland display: $WAYLAND_DISPLAY)"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
         echo "---- weston.log ----"
