@@ -62,6 +62,16 @@ case "$1" in
         echo "---- weston.log ----"
         cat /var/log/weston.log 2>&1 || echo "(no weston.log)"
         echo "---------------------"
+        echo "---- diagnostics ----"
+        echo "free:"
+        free -m 2>&1 || echo "(no free)"
+        echo "ps:"
+        ps aux 2>&1 || echo "(no ps)"
+        echo "runtime dir listing ($XDG_RUNTIME_DIR):"
+        ls -la "$XDG_RUNTIME_DIR" 2>&1 || echo "(cannot list runtime dir)"
+        echo "dmesg tail:"
+        dmesg 2>&1 | tail -60 || echo "(no dmesg)"
+        echo "----------------------"
       fi
     else
       echo "Protea: graphical session unavailable; continuing with core services."
