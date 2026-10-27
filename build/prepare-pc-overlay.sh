@@ -5,6 +5,20 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVERLAY="${ROOT}/build/pc-overlay"
 
 mkdir -p "${OVERLAY}/etc/init.d"
+mkdir -p "${OVERLAY}/etc/xdg/weston"
+
+# Weston's desktop-shell plugin draws its own default top panel with
+# generic placeholder launcher icons and a built-in idle-lock screen -
+# both are separate from protea-desktop and were showing through as a
+# stray, unbranded bar with broken-looking icons. protea-desktop is the
+# only shell UI Protea should show, and it requests fullscreen itself,
+# so disable Weston's own panel/lock entirely.
+cat > "${OVERLAY}/etc/xdg/weston/weston.ini" <<'EOF'
+[shell]
+panel-position=none
+locking=false
+background-color=0xFF17120F
+EOF
 
 cat > "${OVERLAY}/etc/init.d/S99protea" <<'EOF'
 #!/bin/sh

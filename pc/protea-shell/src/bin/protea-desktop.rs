@@ -2,7 +2,11 @@ use gtk::prelude::*;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use gtk::{glib, Application, ApplicationWindow, Box, Button, Label, Orientation, SearchEntry, Separator, ToggleButton};
+use gtk::{
+    glib, Application, ApplicationWindow, Box, Button, EventControllerMotion, Label,
+    Orientation, Revealer, RevealerTransitionType, SearchEntry, Separator, Spinner, Stack,
+    StackTransitionType, ToggleButton,
+};
 use protea_core::{DeviceClass, DeviceProfile, HardwareTier, Permission, ProteaIdentity, ProteaMode, ProteaState, StateStore};
 
 /// A spawned application tracked in the taskbar. Protea has no compositor-level
@@ -20,9 +24,49 @@ type RunningApps = Rc<RefCell<Vec<RunningApp>>>;
 const APP_ID: &str = "org.protea.os.desktop";
 
 fn main() -> glib::ExitCode {
+    // protea-desktop doubles as the launcher for the handful of bundled
+    // apps (see discover_applications/the .desktop files in the overlay):
+    // each one is just `protea-desktop --app <name>`, a second, independent
+    // process. GApplication's single-instance enforcement needs a D-Bus
+    // session bus to detect the existing instance, and this image has none
+    // (no machine-id - see S99protea's "Unable to acquire session bus"
+    // warning), so every spawned process runs its own real, local Activate
+    // regardless of sharing the same application_id. That is relied upon
+    // here: read our own "--app" flag from the real argv before GApplication
+    // gets anywhere near it, then hand GApplication an argv containing only
+    // the program name so it never tries to interpret "--app" itself as an
+    // (unregistered) GOption and fail the process before activation.
+    let args: Vec<String> = std::env::args().collect();
+    let app_mode = args
+        .iter()
+        .position(|a| a == "--app")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
+    let argv0 = args.first().cloned().unwrap_or_else(|| "protea-desktop".to_string());
+
     let app = Application::builder().application_id(APP_ID).build();
 
-    app.connect_activate(|app| {
+    app.connect_activate(move |app| {
+        match app_mode.as_deref() {
+            Some("settings") => {
+                open_settings_window(app);
+                return;
+            }
+            Some("notes") => {
+                open_notes_window(app);
+                return;
+            }
+            Some("calculator") => {
+                open_calculator_window(app);
+                return;
+            }
+            Some("mmino") => {
+                open_unavailable_app_notice(app, "Mmino", "music player");
+                return;
+            }
+            _ => {}
+        }
+
         let store = StateStore::new(state_path());
         let state = load_or_initialize(&store);
 
@@ -33,179 +77,414 @@ fn main() -> glib::ExitCode {
             .default_height(700)
             .build();
 
-        let root = Box::new(Orientation::Vertical, 0);
-        let content = Box::new(Orientation::Vertical, 18);
-        content.set_margin_top(32);
-        content.set_margin_bottom(32);
-        content.set_margin_start(32);
-        content.set_margin_end(32);
+        let stack = Stack::new();
+        stack.set_hexpand(true);
+        stack.set_vexpand(true);
+        stack.set_transition_type(StackTransitionType::Crossfade);
+        stack.set_transition_duration(500);
 
-        let title = Label::new(Some("PROTEA"));
-        title.add_css_class("title-1");
-        let subtitle = Label::new(Some("One identity. One system. Adaptive everywhere."));
-        subtitle.add_css_class("dim-label");
+        let splash = build_splash_page();
+        stack.add_named(&splash, Some("splash"));
 
-        let status = Label::new(Some(&format!(
-            "Device: {:?}  •  Tier: {:?}  •  RAM: {} MB  •  Storage: {} MB  •  GPU: {}  •  Battery: {}  •  Mode: {:?}",
-            state.device.class, state.device.tier, state.device.memory_mb, state.device.storage_mb,
-            if state.device.has_gpu { "yes" } else { "no" },
-            if state.device.has_battery { "yes" } else { "no" }, state.mode
-        )));
+        let (lock_page, sign_in_button) = build_lock_page(&state);
+        stack.add_named(&lock_page, Some("lock"));
 
-        let start = Button::with_label("Start");
-        start.add_css_class("suggested-action");
+        let desktop_page = build_desktop_page(app, &state);
+        stack.add_named(&desktop_page, Some("desktop"));
 
-        let gaming = ToggleButton::with_label("Gaming");
-        gaming.set_active(state.mode == ProteaMode::Gaming);
-        let office = ToggleButton::with_label("Office");
-        office.set_active(state.mode == ProteaMode::Office);
-        gaming.set_group(Some(&office));
-
-        let modes = Box::new(Orientation::Horizontal, 8);
-        modes.append(&gaming);
-        modes.append(&office);
-
-        let identity = Label::new(Some(
-            &state.identity
-                .as_ref()
-                .map(|i| format!("Signed in locally as {}", i.display_name))
-                .unwrap_or_else(|| "No local identity".to_string()),
-        ));
-
-        let settings = Label::new(Some(
-            &format!("Settings stored locally: {}", state.settings.len()),
-        ));
-
-        let separator = Separator::new(Orientation::Horizontal);
-
-        content.append(&title);
-        content.append(&subtitle);
-        content.append(&separator);
-        content.append(&status);
-        content.append(&identity);
-        content.append(&settings);
-        content.append(&modes);
-        content.append(&start);
-
-        let taskbar = Box::new(Orientation::Horizontal, 10);
-        taskbar.set_margin_start(12);
-        taskbar.set_margin_end(12);
-        taskbar.set_margin_top(8);
-        taskbar.set_margin_bottom(8);
-
-        let start_menu = Button::with_label("Protea");
-        taskbar.append(&start_menu);
-
-        // Real running-app entries, Windows-taskbar style: one button per
-        // spawned app, removed automatically once that process exits.
-        let running_box = Box::new(Orientation::Horizontal, 6);
-        running_box.set_hexpand(true);
-        taskbar.append(&running_box);
-        let running_apps: RunningApps = Rc::new(RefCell::new(Vec::new()));
+        stack.set_visible_child_name("splash");
 
         {
-            let running_apps = running_apps.clone();
-            glib::timeout_add_seconds_local(2, move || {
-                let mut apps = running_apps.borrow_mut();
-                apps.retain_mut(|app| match app.child.try_wait() {
-                    Ok(Some(_status)) => {
-                        app.button.unparent();
-                        false
-                    }
-                    _ => true,
-                });
-                glib::ControlFlow::Continue
+            let stack = stack.clone();
+            glib::timeout_add_local(std::time::Duration::from_millis(2200), move || {
+                stack.set_visible_child_name("lock");
+                glib::ControlFlow::Break
             });
         }
 
-        let tray = Box::new(Orientation::Horizontal, 10);
-        let tray_mode = Label::new(Some(&format!("{:?}", state.mode)));
-        tray.append(&tray_mode);
-        if state.device.has_battery {
-            tray.append(&Label::new(Some("Battery")));
+        {
+            let stack = stack.clone();
+            sign_in_button.connect_clicked(move |_| {
+                stack.set_visible_child_name("desktop");
+            });
         }
-        let clock = Label::new(Some("Protea Desktop"));
-        tray.append(&clock);
-        taskbar.append(&tray);
 
-        let system = Box::new(Orientation::Horizontal, 8);
-        let settings_button = Button::with_label("Settings");
-        let reboot_button = Button::with_label("Restart");
-        let shutdown_button = Button::with_label("Shut down");
-        system.append(&settings_button);
-        system.append(&reboot_button);
-        system.append(&shutdown_button);
-
-        content.append(&system);
-
-        let settings_app = app.clone();
-        settings_button.connect_clicked(move |_| {
-            open_settings_window(&settings_app);
-        });
-
-        reboot_button.connect_clicked(move |_| {
-            request_power_action("reboot");
-        });
-
-        shutdown_button.connect_clicked(move |_| {
-            request_power_action("poweroff");
-        });
-
-        root.append(&content);
-        root.append(&taskbar);
-        window.set_child(Some(&root));
-
-        let store_gaming = StateStore::new(state_path());
-        let status_gaming = status.clone();
-        gaming.connect_toggled(move |button| {
-            if button.is_active() {
-                let mut current = load_or_initialize(&store_gaming);
-                current.set_mode(ProteaMode::Gaming);
-                let _ = store_gaming.save(&current);
-                apply_mode_policy(current.mode);
-                status_gaming.set_text(&format!(
-                    "Device: {:?}  •  Tier: {:?}  •  Mode: Gaming",
-                    current.device.class, current.device.tier
-                ));
-            }
-        });
-
-        let store_office = StateStore::new(state_path());
-        let status_office = status.clone();
-        office.connect_toggled(move |button| {
-            if button.is_active() {
-                let mut current = load_or_initialize(&store_office);
-                current.set_mode(ProteaMode::Office);
-                let _ = store_office.save(&current);
-                apply_mode_policy(current.mode);
-                status_office.set_text(&format!(
-                    "Device: {:?}  •  Tier: {:?}  •  Mode: Office",
-                    current.device.class, current.device.tier
-                ));
-            }
-        });
-
-        let start_menu_app = app.clone();
-        let start_menu_running = running_apps.clone();
-        let start_menu_running_box = running_box.clone();
-        start_menu.connect_clicked(move |_| {
-            open_app_launcher(&start_menu_app, start_menu_running.clone(), &start_menu_running_box);
-        });
-
-        let start_app = app.clone();
-        let start_running = running_apps.clone();
-        let start_running_box = running_box.clone();
-        start.connect_clicked(move |_| {
-            open_app_launcher(&start_app, start_running.clone(), &start_running_box);
-        });
-
-        apply_mode_policy(state.mode);
+        window.set_child(Some(&stack));
+        window.fullscreen();
         apply_css();
         window.present();
         eprintln!("PROTEA_DESKTOP_WINDOW_PRESENTED");
     });
 
-    app.run()
+    app.run_with_args(&[argv0])
+}
+
+fn build_splash_page() -> Box {
+    let page = Box::new(Orientation::Vertical, 0);
+    page.add_css_class("protea-splash");
+    page.set_hexpand(true);
+    page.set_vexpand(true);
+
+    let centered = Box::new(Orientation::Vertical, 16);
+    centered.set_halign(gtk::Align::Center);
+    centered.set_valign(gtk::Align::Center);
+    centered.set_hexpand(true);
+    centered.set_vexpand(true);
+
+    let logo = Label::new(Some("PROTEA"));
+    logo.add_css_class("protea-logo");
+    let tagline = Label::new(Some("One identity. One system. Adaptive everywhere."));
+    tagline.add_css_class("dim-label");
+
+    let spinner = Spinner::new();
+    spinner.set_size_request(32, 32);
+    spinner.start();
+
+    let status = Label::new(Some("Starting Protea..."));
+    status.add_css_class("dim-label");
+
+    centered.append(&logo);
+    centered.append(&tagline);
+    centered.append(&spinner);
+    centered.append(&status);
+    page.append(&centered);
+    page
+}
+
+fn build_lock_page(state: &ProteaState) -> (Box, Button) {
+    let page = Box::new(Orientation::Vertical, 0);
+    page.add_css_class("protea-lockscreen");
+    page.set_hexpand(true);
+    page.set_vexpand(true);
+
+    let centered = Box::new(Orientation::Vertical, 14);
+    centered.set_halign(gtk::Align::Center);
+    centered.set_valign(gtk::Align::Center);
+    centered.set_hexpand(true);
+    centered.set_vexpand(true);
+
+    let display_name = state
+        .identity
+        .as_ref()
+        .map(|i| i.display_name.clone())
+        .unwrap_or_else(|| "Protea User".to_string());
+    let initial = display_name.chars().next().unwrap_or('P').to_uppercase().to_string();
+
+    let avatar = Label::new(Some(&initial));
+    avatar.add_css_class("protea-avatar");
+    avatar.set_size_request(96, 96);
+    avatar.set_halign(gtk::Align::Center);
+
+    let name_label = Label::new(Some(&display_name));
+    name_label.add_css_class("protea-lock-name");
+
+    let subtext = Label::new(Some("Local account  •  no password required"));
+    subtext.add_css_class("dim-label");
+
+    let sign_in_button = Button::with_label("Sign In");
+    sign_in_button.add_css_class("suggested-action");
+    sign_in_button.set_halign(gtk::Align::Center);
+    sign_in_button.set_margin_top(10);
+
+    centered.append(&avatar);
+    centered.append(&name_label);
+    centered.append(&subtext);
+    centered.append(&sign_in_button);
+    page.append(&centered);
+
+    (page, sign_in_button)
+}
+
+fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
+    let page = Box::new(Orientation::Vertical, 0);
+    page.set_hexpand(true);
+    page.set_vexpand(true);
+
+    let content = Box::new(Orientation::Vertical, 18);
+    content.set_vexpand(true);
+    content.set_margin_top(32);
+    content.set_margin_bottom(32);
+    content.set_margin_start(32);
+    content.set_margin_end(32);
+
+    let title = Label::new(Some("PROTEA"));
+    title.add_css_class("title-1");
+    let subtitle = Label::new(Some("One identity. One system. Adaptive everywhere."));
+    subtitle.add_css_class("dim-label");
+
+    let welcome = Label::new(Some(
+        "Hi, welcome to Protea. This is a new operating system — this is Protea OS.",
+    ));
+    welcome.add_css_class("protea-welcome");
+    welcome.set_halign(gtk::Align::Start);
+    welcome.set_wrap(true);
+
+    let status = Label::new(Some(&format!(
+        "Device: {:?}  •  Tier: {:?}  •  RAM: {} MB  •  Storage: {} MB  •  GPU: {}  •  Battery: {}  •  Mode: {:?}",
+        state.device.class, state.device.tier, state.device.memory_mb, state.device.storage_mb,
+        if state.device.has_gpu { "yes" } else { "no" },
+        if state.device.has_battery { "yes" } else { "no" }, state.mode
+    )));
+
+    let start = Button::with_label("Start");
+    start.add_css_class("suggested-action");
+
+    let gaming = ToggleButton::with_label("Gaming");
+    gaming.set_active(state.mode == ProteaMode::Gaming);
+    let office = ToggleButton::with_label("Office");
+    office.set_active(state.mode == ProteaMode::Office);
+    gaming.set_group(Some(&office));
+
+    let modes = Box::new(Orientation::Horizontal, 8);
+    modes.append(&gaming);
+    modes.append(&office);
+
+    let identity = Label::new(Some(
+        &state.identity
+            .as_ref()
+            .map(|i| format!("Signed in locally as {}", i.display_name))
+            .unwrap_or_else(|| "No local identity".to_string()),
+    ));
+
+    let settings_count = Label::new(Some(
+        &format!("Settings stored locally: {}", state.settings.len()),
+    ));
+
+    let separator = Separator::new(Orientation::Horizontal);
+
+    content.append(&title);
+    content.append(&subtitle);
+    content.append(&welcome);
+    content.append(&separator);
+    content.append(&status);
+    content.append(&identity);
+    content.append(&settings_count);
+    content.append(&modes);
+    content.append(&start);
+
+    let system = Box::new(Orientation::Horizontal, 8);
+    let settings_button = Button::with_label("Settings");
+    let reboot_button = Button::with_label("Restart");
+    let shutdown_button = Button::with_label("Shut down");
+    system.append(&settings_button);
+    system.append(&reboot_button);
+    system.append(&shutdown_button);
+    content.append(&system);
+
+    let settings_app = app.clone();
+    settings_button.connect_clicked(move |_| {
+        open_settings_window(&settings_app);
+    });
+
+    reboot_button.connect_clicked(move |_| {
+        request_power_action("reboot");
+    });
+
+    shutdown_button.connect_clicked(move |_| {
+        request_power_action("poweroff");
+    });
+
+    let store_gaming = StateStore::new(state_path());
+    let status_gaming = status.clone();
+    gaming.connect_toggled(move |button| {
+        if button.is_active() {
+            let mut current = load_or_initialize(&store_gaming);
+            current.set_mode(ProteaMode::Gaming);
+            let _ = store_gaming.save(&current);
+            apply_mode_policy(current.mode);
+            status_gaming.set_text(&format!(
+                "Device: {:?}  •  Tier: {:?}  •  Mode: Gaming",
+                current.device.class, current.device.tier
+            ));
+        }
+    });
+
+    let store_office = StateStore::new(state_path());
+    let status_office = status.clone();
+    office.connect_toggled(move |button| {
+        if button.is_active() {
+            let mut current = load_or_initialize(&store_office);
+            current.set_mode(ProteaMode::Office);
+            let _ = store_office.save(&current);
+            apply_mode_policy(current.mode);
+            status_office.set_text(&format!(
+                "Device: {:?}  •  Tier: {:?}  •  Mode: Office",
+                current.device.class, current.device.tier
+            ));
+        }
+    });
+
+    apply_mode_policy(state.mode);
+
+    // Bottom taskbar, Windows-style: wrapped in a Revealer so it can
+    // auto-hide, and placed after `content` (which is vexpand) so it is
+    // flush against the bottom edge of the screen rather than floating
+    // directly under the content block.
+    let taskbar = Box::new(Orientation::Horizontal, 10);
+    taskbar.add_css_class("protea-taskbar");
+    taskbar.set_margin_start(12);
+    taskbar.set_margin_end(12);
+    taskbar.set_margin_top(8);
+    taskbar.set_margin_bottom(8);
+
+    let start_menu = Button::with_label("Protea");
+    taskbar.append(&start_menu);
+
+    let running_box = Box::new(Orientation::Horizontal, 6);
+    running_box.set_hexpand(true);
+    taskbar.append(&running_box);
+    let running_apps: RunningApps = Rc::new(RefCell::new(Vec::new()));
+
+    {
+        let running_apps = running_apps.clone();
+        glib::timeout_add_seconds_local(2, move || {
+            let mut apps = running_apps.borrow_mut();
+            apps.retain_mut(|app| match app.child.try_wait() {
+                Ok(Some(_status)) => {
+                    app.button.unparent();
+                    false
+                }
+                _ => true,
+            });
+            glib::ControlFlow::Continue
+        });
+    }
+
+    let tray = Box::new(Orientation::Horizontal, 10);
+    let tray_mode = Label::new(Some(&format!("{:?}", state.mode)));
+    tray.append(&tray_mode);
+    if state.device.has_battery {
+        tray.append(&Label::new(Some("Battery")));
+    }
+    let clock = Label::new(Some(&current_datetime_string()));
+    tray.append(&clock);
+    taskbar.append(&tray);
+
+    {
+        let clock = clock.clone();
+        glib::timeout_add_seconds_local(1, move || {
+            clock.set_text(&current_datetime_string());
+            glib::ControlFlow::Continue
+        });
+    }
+
+    let revealer = Revealer::new();
+    revealer.set_transition_type(RevealerTransitionType::SlideUp);
+    revealer.set_transition_duration(200);
+    revealer.set_reveal_child(true);
+    revealer.set_child(Some(&taskbar));
+    revealer.set_valign(gtk::Align::End);
+
+    page.append(&content);
+    page.append(&revealer);
+
+    install_taskbar_auto_hide(&page, &revealer);
+
+    let start_menu_app = app.clone();
+    let start_menu_running = running_apps.clone();
+    let start_menu_running_box = running_box.clone();
+    start_menu.connect_clicked(move |_| {
+        open_app_launcher(&start_menu_app, start_menu_running.clone(), &start_menu_running_box);
+    });
+
+    let start_app = app.clone();
+    let start_running = running_apps.clone();
+    let start_running_box = running_box.clone();
+    start.connect_clicked(move |_| {
+        open_app_launcher(&start_app, start_running.clone(), &start_running_box);
+    });
+
+    page
+}
+
+/// Reveals the bottom taskbar while the pointer is near the bottom edge of
+/// the desktop page, and hides it again a short moment after the pointer
+/// moves away - the same "auto-hide" behaviour as the Windows taskbar.
+fn install_taskbar_auto_hide(page: &Box, revealer: &Revealer) {
+    const HOT_ZONE_PX: f64 = 56.0;
+    const HIDE_DELAY_MS: u64 = 900;
+
+    let hide_timer: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
+    let motion = EventControllerMotion::new();
+
+    {
+        let revealer = revealer.clone();
+        let hide_timer = hide_timer.clone();
+        let page_for_height = page.clone();
+        motion.connect_motion(move |_controller, _x, y| {
+            let height = page_for_height.height() as f64;
+            let near_bottom = height <= 0.0 || y >= height - HOT_ZONE_PX;
+
+            if let Some(source) = hide_timer.borrow_mut().take() {
+                source.remove();
+            }
+
+            if near_bottom {
+                revealer.set_reveal_child(true);
+            } else {
+                let revealer = revealer.clone();
+                let hide_timer_for_tick = hide_timer.clone();
+                let source = glib::timeout_add_local(
+                    std::time::Duration::from_millis(HIDE_DELAY_MS),
+                    move || {
+                        revealer.set_reveal_child(false);
+                        *hide_timer_for_tick.borrow_mut() = None;
+                        glib::ControlFlow::Break
+                    },
+                );
+                *hide_timer.borrow_mut() = Some(source);
+            }
+        });
+    }
+
+    {
+        let revealer = revealer.clone();
+        let hide_timer = hide_timer.clone();
+        motion.connect_leave(move |_controller| {
+            if let Some(source) = hide_timer.borrow_mut().take() {
+                source.remove();
+            }
+            let revealer = revealer.clone();
+            let hide_timer_for_tick = hide_timer.clone();
+            let source = glib::timeout_add_local(
+                std::time::Duration::from_millis(HIDE_DELAY_MS),
+                move || {
+                    revealer.set_reveal_child(false);
+                    *hide_timer_for_tick.borrow_mut() = None;
+                    glib::ControlFlow::Break
+                },
+            );
+            *hide_timer.borrow_mut() = Some(source);
+        });
+    }
+
+    page.add_controller(motion);
+
+    // Hide the taskbar automatically a few seconds after boot so the
+    // "hidden by default, reveals on hover" behaviour is visible without
+    // the user having to move the mouse away first.
+    let revealer_for_initial_hide = revealer.clone();
+    glib::timeout_add_local(std::time::Duration::from_millis(3000), move || {
+        revealer_for_initial_hide.set_reveal_child(false);
+        glib::ControlFlow::Break
+    });
+}
+
+/// Real wall-clock date/time, shelled out to `date` (BusyBox on this image)
+/// rather than hand-rolled calendar math. This image has no timezone
+/// database configured, so the system clock is UTC - that is still the
+/// correct, live, host-synced time (QEMU/the real hardware clock already
+/// supplies it), just labelled honestly rather than implied to be a local
+/// zone we have not actually configured.
+fn current_datetime_string() -> String {
+    std::process::Command::new("date")
+        .arg("+%A, %d %B %Y  —  %H:%M:%S")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|text| format!("{} UTC", text.trim()))
+        .unwrap_or_else(|| "Time unavailable".to_string())
 }
 
 fn state_path() -> std::path::PathBuf {
@@ -291,7 +570,16 @@ fn apply_css() {
         None => "window { background: #17120f; }".to_string(),
     };
     provider.load_from_data(&format!(
-        "{background} .title-1 {{ font-weight: 800; font-size: 34px; }}"
+        "{background}
+        .title-1 {{ font-weight: 800; font-size: 34px; }}
+        .protea-logo {{ font-weight: 900; font-size: 56px; letter-spacing: 4px; color: #f4e9c1; }}
+        .protea-splash {{ background-color: #17120f; }}
+        .protea-lockscreen {{ background-color: rgba(0,0,0,0.45); }}
+        .protea-lock-name {{ font-weight: 700; font-size: 22px; }}
+        .protea-avatar {{ background-color: #c0453a; border-radius: 48px; color: white; font-weight: 700; font-size: 34px; }}
+        .protea-welcome {{ font-size: 15px; font-style: italic; color: #f4e9c1; }}
+        .protea-taskbar {{ background-color: rgba(23,18,15,0.78); }}
+        "
     ));
     if let Some(display) = gtk::gdk::Display::default() {
         gtk::style_context_add_provider_for_display(
@@ -683,6 +971,212 @@ fn open_settings_window(app: &Application) {
     window.present();
 }
 
+fn notes_path() -> std::path::PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        return std::path::PathBuf::from(home).join(".local/share/protea/notes.txt");
+    }
+    std::path::PathBuf::from(".protea/notes.txt")
+}
+
+fn open_notes_window(app: &Application) {
+    let path = notes_path();
+
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Ngwala — Notes")
+        .default_width(480)
+        .default_height(560)
+        .build();
+
+    let root = Box::new(Orientation::Vertical, 10);
+    root.set_margin_top(16);
+    root.set_margin_bottom(16);
+    root.set_margin_start(16);
+    root.set_margin_end(16);
+
+    let title = Label::new(Some("Ngwala Notes"));
+    title.add_css_class("title-2");
+    root.append(&title);
+
+    let scroller = gtk::ScrolledWindow::new();
+    scroller.set_vexpand(true);
+    let text_view = gtk::TextView::new();
+    text_view.set_wrap_mode(gtk::WrapMode::WordChar);
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    text_view.buffer().set_text(&existing);
+    scroller.set_child(Some(&text_view));
+    root.append(&scroller);
+
+    let status = Label::new(Some("Notes are saved locally to your Protea profile."));
+    status.add_css_class("dim-label");
+    root.append(&status);
+
+    let actions = Box::new(Orientation::Horizontal, 8);
+    let save = Button::with_label("Save");
+    save.add_css_class("suggested-action");
+    let close = Button::with_label("Close");
+    actions.append(&save);
+    actions.append(&close);
+    root.append(&actions);
+
+    let save_path = path.clone();
+    let save_buffer = text_view.buffer();
+    let save_status = status.clone();
+    save.connect_clicked(move |_| {
+        let (start, end) = (save_buffer.start_iter(), save_buffer.end_iter());
+        let text = save_buffer.text(&start, &end, false);
+        if let Some(parent) = save_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        match std::fs::write(&save_path, text.as_str()) {
+            Ok(()) => save_status.set_text("Saved."),
+            Err(error) => save_status.set_text(&format!("Could not save: {error}")),
+        }
+    });
+
+    let window_close = window.clone();
+    close.connect_clicked(move |_| window_close.close());
+
+    window.set_child(Some(&root));
+    window.present();
+}
+
+type CalculatorState = Rc<RefCell<(f64, Option<char>, String)>>;
+
+fn open_calculator_window(app: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Bala — Calculator")
+        .default_width(300)
+        .default_height(420)
+        .resizable(false)
+        .build();
+
+    let root = Box::new(Orientation::Vertical, 10);
+    root.set_margin_top(16);
+    root.set_margin_bottom(16);
+    root.set_margin_start(16);
+    root.set_margin_end(16);
+
+    let display = Label::new(Some("0"));
+    display.set_halign(gtk::Align::End);
+    display.add_css_class("title-2");
+    root.append(&display);
+
+    let state: CalculatorState = Rc::new(RefCell::new((0.0, None, String::new())));
+
+    let grid = gtk::Grid::new();
+    grid.set_row_spacing(6);
+    grid.set_column_spacing(6);
+    grid.set_vexpand(true);
+
+    let buttons: [(&str, i32, i32); 16] = [
+        ("7", 0, 0), ("8", 1, 0), ("9", 2, 0), ("/", 3, 0),
+        ("4", 0, 1), ("5", 1, 1), ("6", 2, 1), ("*", 3, 1),
+        ("1", 0, 2), ("2", 1, 2), ("3", 2, 2), ("-", 3, 2),
+        ("0", 0, 3), ("C", 1, 3), ("=", 2, 3), ("+", 3, 3),
+    ];
+
+    for (label, col, row) in buttons {
+        let button = Button::with_label(label);
+        button.set_hexpand(true);
+        button.set_vexpand(true);
+        let state = state.clone();
+        let display = display.clone();
+        let input = label.to_string();
+        button.connect_clicked(move |_| {
+            calculator_handle_input(&state, &display, &input);
+        });
+        grid.attach(&button, col, row, 1, 1);
+    }
+
+    root.append(&grid);
+    window.set_child(Some(&root));
+    window.present();
+}
+
+fn calculator_handle_input(state: &CalculatorState, display: &Label, input: &str) {
+    let mut s = state.borrow_mut();
+    match input {
+        "C" => {
+            s.0 = 0.0;
+            s.1 = None;
+            s.2.clear();
+            display.set_text("0");
+        }
+        "+" | "-" | "*" | "/" => {
+            let entry: f64 = s.2.parse().unwrap_or(0.0);
+            apply_pending(&mut s, entry);
+            s.1 = input.chars().next();
+            s.2.clear();
+            display.set_text(&format_number(s.0));
+        }
+        "=" => {
+            let entry: f64 = s.2.parse().unwrap_or(0.0);
+            apply_pending(&mut s, entry);
+            s.1 = None;
+            s.2.clear();
+            display.set_text(&format_number(s.0));
+        }
+        digit => {
+            s.2.push_str(digit);
+            display.set_text(&s.2);
+        }
+    }
+}
+
+fn apply_pending(s: &mut (f64, Option<char>, String), entry: f64) {
+    match s.1 {
+        Some('+') => s.0 += entry,
+        Some('-') => s.0 -= entry,
+        Some('*') => s.0 *= entry,
+        Some('/') => {
+            if entry != 0.0 {
+                s.0 /= entry;
+            }
+        }
+        None => s.0 = entry,
+        _ => {}
+    }
+}
+
+fn format_number(n: f64) -> String {
+    if (n - n.trunc()).abs() < f64::EPSILON {
+        format!("{}", n as i64)
+    } else {
+        format!("{:.4}", n)
+    }
+}
+
+fn open_unavailable_app_notice(app: &Application, name: &str, kind: &str) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title(name)
+        .default_width(380)
+        .default_height(160)
+        .resizable(false)
+        .build();
+
+    let root = Box::new(Orientation::Vertical, 14);
+    root.set_margin_top(24);
+    root.set_margin_bottom(24);
+    root.set_margin_start(24);
+    root.set_margin_end(24);
+
+    root.append(&Label::new(Some(&format!(
+        "{name} ({kind}) has not been built yet in this version of Protea OS."
+    ))));
+
+    let close = Button::with_label("Close");
+    close.set_halign(gtk::Align::End);
+    let window_close = window.clone();
+    close.connect_clicked(move |_| window_close.close());
+    root.append(&close);
+
+    window.set_child(Some(&root));
+    window.present();
+}
+
 fn request_power_action(action: &str) {
     let command = if action == "reboot" { "reboot" } else { "poweroff" }.to_string();
     let action_name = if action == "reboot" { "restart" } else { "shut down" }.to_string();
@@ -701,7 +1195,7 @@ fn request_power_action(action: &str) {
         }
 
         let status = std::process::Command::new("loginctl")
-.arg(&command)
+            .arg(&command)
             .status();
 
         if !matches!(status, Ok(status) if status.success()) {
