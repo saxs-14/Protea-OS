@@ -7,6 +7,30 @@ OVERLAY="${ROOT}/build/pc-overlay"
 mkdir -p "${OVERLAY}/etc/init.d"
 mkdir -p "${OVERLAY}/etc/xdg/weston"
 
+# Bundle the heritage wallpapers (see assets/wallpapers/CREDITS.md for
+# licensing/attribution) into the image. They're fetched once into
+# assets/wallpapers/<site>/<file> by tools/fetch-heritage-wallpapers.py and
+# committed to the repo - no network access needed at build time. They are
+# nested per-site, but protea-desktop's select_wallpaper() does a flat
+# read_dir() on /usr/share/protea/wallpapers, so flatten them here.
+WALLPAPER_SRC="${ROOT}/assets/wallpapers"
+WALLPAPER_DEST="${OVERLAY}/usr/share/protea/wallpapers"
+mkdir -p "${WALLPAPER_DEST}"
+for site_dir in "${WALLPAPER_SRC}"/*/; do
+  [ -d "${site_dir}" ] || continue
+  site_slug="$(basename "${site_dir}")"
+  for image in "${site_dir}"*.jpg "${site_dir}"*.jpeg "${site_dir}"*.png; do
+    [ -f "${image}" ] || continue
+    cp "${image}" "${WALLPAPER_DEST}/${site_slug}__$(basename "${image}")"
+  done
+done
+wallpaper_count=$(find "${WALLPAPER_DEST}" -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' \) | wc -l)
+echo "Bundled ${wallpaper_count} wallpaper image(s) into the overlay."
+if [ "${wallpaper_count}" -eq 0 ]; then
+  echo "Protea validation error: no wallpaper images found in ${WALLPAPER_SRC} - run tools/fetch-heritage-wallpapers.py first."
+  exit 1
+fi
+
 # Weston's desktop-shell plugin draws its own default top panel with
 # generic placeholder launcher icons and a built-in idle-lock screen -
 # both are separate from protea-desktop and were showing through as a
@@ -14,6 +38,15 @@ mkdir -p "${OVERLAY}/etc/xdg/weston"
 # only shell UI Protea should show, and it requests fullscreen itself,
 # so disable Weston's own panel/lock entirely.
 cat > "${OVERLAY}/etc/xdg/weston/weston.ini" <<'EOF'
+[core]
+# Weston's drm-backend silently falls back to the pixman (software,
+# SHM-only) renderer whenever its own gl-renderer can't initialise - and
+# pixman-renderer has no dma-buf/GL buffer-sharing support at all, so a
+# GL client would get no usable buffer regardless of its own renderer.
+# Force gl explicitly so a failure here is loud rather than a silent
+# fallback that looks superficially fine but breaks any GL client.
+renderer=gl
+
 [shell]
 panel-position=none
 locking=false
@@ -61,7 +94,7 @@ case "$1" in
       chown protea:protea "$PROTEA_RUNTIME_DIR"
       chmod 700 "$PROTEA_RUNTIME_DIR"
       export XDG_RUNTIME_DIR="$PROTEA_RUNTIME_DIR"
-      weston --backend=drm-backend.so --log=/var/log/weston.log &
+      weston --backend=drm-backend.so --renderer=gl --log=/var/log/weston.log &
       # Do not assume the compositor binds "wayland-0": libseat's embedded
       # seatd launcher (used here since there is no systemd-logind or
       # standalone seatd) forks weston internally, and the resulting socket

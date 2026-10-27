@@ -50,12 +50,46 @@ append_config "BR2_PACKAGE_LIBGTK4_WAYLAND" "y"
 append_config "BR2_PACKAGE_WESTON" "y"
 append_config "BR2_PACKAGE_WESTON_DEFAULT_DRM" "y"
 append_config "BR2_PACKAGE_WESTON_SIMPLE_CLIENTS" "y"
+# BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SWRAST does not exist in current
+# Buildroot (verified against buildroot/buildroot master package/mesa3d/
+# Config.in - the real Gallium driver symbols are CROCUS/ETNAVIV/.../
+# LLVMPIPE/.../SOFTPIPE/..., no "SWRAST" entry anywhere). Kconfig silently
+# drops an unrecognized symbol during olddefconfig with no error, so this
+# line has been a complete no-op this whole time: no Gallium driver was
+# ever enabled, which forced BR2_PACKAGE_MESA3D_OPENGL_EGL and
+# BR2_PACKAGE_MESA3D_GBM off too (both "depends on" the Gallium-driver
+# bool, which only a real per-driver symbol can select) - exactly matching
+# the observed "could not open zink: zink_dri.so" / "No EGL configuration
+# available" messages and GTK 4.14's removed no-GL Cairo fallback crashing
+# on an unchecked oversized buffer. The real llvmpipe (software Gallium)
+# driver symbol also needs its own LLVM toggle turned on explicitly
+# (LLVMPIPE "depends on" MESA3D_LLVM, it does not select it).
+#
+# This is the client-side half of the fix; Weston itself also needs the
+# same EGL/GBM/GLES trio present (see weston.mk: gl-renderer is compiled
+# in only when BR2_PACKAGE_HAS_LIBEGL + HAS_LIBGBM + HAS_LIBGLES are ALL
+# provided) or its own drm-backend silently falls back to the pixman
+# renderer, which has zero dma-buf/GL buffer-sharing support - so a
+# working client renderer would still have nothing to hand buffers to.
 append_config "BR2_PACKAGE_MESA3D" "y"
-append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SWRAST" "y"
+append_config "BR2_PACKAGE_MESA3D_LLVM" "y"
+append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE" "y"
 append_config "BR2_PACKAGE_MESA3D_OPENGL_EGL" "y"
+append_config "BR2_PACKAGE_MESA3D_OPENGL_ES" "y"
 append_config "BR2_PACKAGE_MESA3D_GBM" "y"
+append_config "BR2_PACKAGE_WAYLAND" "y"
 append_config "BR2_PACKAGE_CAIRO_PNG" "y"
 append_config "BR2_PACKAGE_CAIRO_ZLIB" "y"
+# GTK4's CSS "background-image: url(...)" (used for the desktop wallpaper)
+# decodes images via gdk-pixbuf, whose JPEG/PNG loaders are each gated
+# behind a separate codec package (confirmed in gdk-pixbuf.mk: jpeg support
+# is "-Djpeg=enabled" only if BR2_PACKAGE_JPEG=y, same for libpng). Neither
+# was enabled, even though most bundled wallpapers are .jpg - a failed/
+# garbage image decode in that path is a strong candidate for the "too big"
+# Cairo surface crash protea-desktop has been hitting on first paint.
+append_config "BR2_PACKAGE_GDK_PIXBUF" "y"
+append_config "BR2_PACKAGE_JPEG" "y"
+append_config "BR2_PACKAGE_LIBPNG" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660_GRUB2" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660_INITRD" "y"
