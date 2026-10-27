@@ -94,16 +94,19 @@ case "$1" in
         # X11 display. Open up the socket so the protea-user client can
         # actually connect to the root-owned compositor.
         chmod 777 "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" 2>/dev/null || true
-        # GSK_RENDERER=cairo: this image has no EGL configuration at all
-        # (no GPU driver, no software GL), so GSK's default behaviour -
-        # try the NGL renderer, fail, try the GL renderer, fail, then fall
-        # back to Cairo - leaves the renderer in a broken half-initialised
-        # state. That is the actual cause of the repeated "g_object_ref:
+        # GDK_SCALE=1: read GTK's own gdk_wayland_display_create_shm_surface()
+        # source directly - it computes scaled_width = width * <output's
+        # fractional scale factor> and uses that to size the Cairo/shared-
+        # memory buffer for EVERY surface, with no sanity check on the
+        # result. That is the actual cause of the repeated "g_object_ref:
         # assertion G_IS_OBJECT (object) failed" criticals and the fatal
-        # Wayland shared-memory-buffer crash a few hundred ms after the
-        # window first presents. Forcing Cairo directly skips the failed
-        # GL attempts and initialises it cleanly.
-        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland GSK_RENDERER=cairo /usr/bin/protea-desktop" &
+        # "too big"/shared-memory crash a few hundred ms after the window
+        # first presents - it happens regardless of what the window
+        # contains, because it is about the OUTPUT's reported scale, not
+        # app content. Whatever scale weston reports for this virtio-gpu/
+        # bochs-drm virtual display, forcing GDK_SCALE=1 bypasses it and
+        # uses a fixed, sane scale of 1 instead.
+        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland GDK_SCALE=1 /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK (wayland display: $WAYLAND_DISPLAY)"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
