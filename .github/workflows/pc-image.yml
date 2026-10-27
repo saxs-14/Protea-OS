@@ -76,14 +76,20 @@ jobs:
           code=$?
           set -e
           cat qemu-boot.log
-          if grep -q "PROTEA_BOOT_OK" qemu-boot.log; then
+          # The console log has ANSI colour codes embedded INSIDE keywords
+          # (e.g. "Gtk-<esc>[1;33mWARNING<esc>[0m"), so a plain grep for
+          # "Gtk-WARNING" never matches - strip them first so pattern
+          # matching below actually works.
+          sed -r 's/\x1b\[[0-9;]*m//g' qemu-boot.log > qemu-boot.clean.log
+          CRASH_PATTERN='reported baselines|g_object_ref: assertion|Unable to create Cairo image surface|segfault|Segmentation fault|protea-desktop.*panicked|Failed to open display'
+          if grep -q "PROTEA_BOOT_OK" qemu-boot.clean.log; then
             echo "QEMU PC image boot reached Protea system readiness."
-            if grep -q "PROTEA_GRAPHICS_OK" qemu-boot.log; then
-              if grep -Eqi "Failed to open display|Gtk-WARNING|Gtk-ERROR|protea-desktop.*panicked" qemu-boot.log; then
-                echo "Weston started but protea-desktop failed to connect/render - see qemu-boot.log."
+            if grep -q "PROTEA_GRAPHICS_OK" qemu-boot.clean.log; then
+              if grep -Eqi "$CRASH_PATTERN" qemu-boot.clean.log; then
+                echo "Weston started but protea-desktop crashed or failed to render - see qemu-boot.log."
                 exit 1
               fi
-              if ! grep -q "PROTEA_DESKTOP_WINDOW_PRESENTED" qemu-boot.log; then
+              if ! grep -q "PROTEA_DESKTOP_WINDOW_PRESENTED" qemu-boot.clean.log; then
                 echo "Weston started but protea-desktop never reported its window as presented - see qemu-boot.log."
                 exit 1
               fi
@@ -92,7 +98,7 @@ jobs:
               echo "Boot succeeded but the graphical session did not start - see qemu-boot.log."
               exit 1
             fi
-          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|cannot mount root" qemu-boot.log; then
+          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|cannot mount root" qemu-boot.clean.log; then
             echo "PC image kernel/root filesystem failure detected."
             exit 1
           elif [ "$code" -eq 124 ]; then
@@ -121,12 +127,18 @@ jobs:
           code=$?
           set -e
           cat qemu-iso-boot.log
-          if grep -q "PROTEA_BOOT_OK" qemu-iso-boot.log; then
+          sed -r 's/\x1b\[[0-9;]*m//g' qemu-iso-boot.log > qemu-iso-boot.clean.log
+          CRASH_PATTERN='reported baselines|g_object_ref: assertion|Unable to create Cairo image surface|segfault|Segmentation fault|protea-desktop.*panicked|Failed to open display'
+          if grep -q "PROTEA_BOOT_OK" qemu-iso-boot.clean.log; then
+            if grep -q "PROTEA_GRAPHICS_OK" qemu-iso-boot.clean.log && grep -Eqi "$CRASH_PATTERN" qemu-iso-boot.clean.log; then
+              echo "ISO boot reached readiness but protea-desktop crashed or failed to render - see qemu-iso-boot.log."
+              exit 1
+            fi
             echo "Protea ISO boot reached system readiness."
-          elif grep -Eqi "file .* not found|grub rescue|grub>" qemu-iso-boot.log; then
+          elif grep -Eqi "file .* not found|grub rescue|grub>" qemu-iso-boot.clean.log; then
             echo "ISO bootloader/configuration failure detected."
             exit 1
-          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|Cannot open root device" qemu-iso-boot.log; then
+          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|Cannot open root device" qemu-iso-boot.clean.log; then
             echo "ISO kernel/root filesystem failure detected."
             exit 1
           elif [ "$code" -eq 124 ]; then
@@ -159,7 +171,9 @@ jobs:
           name: protea-boot-diagnostics-${{ github.run_number }}
           path: |
             qemu-boot.log
+            qemu-boot.clean.log
             qemu-iso-boot.log
+            qemu-iso-boot.clean.log
             iso-file-list.txt
           if-no-files-found: warn
           retention-days: 14

@@ -76,6 +76,14 @@ fn main() -> glib::ExitCode {
             .default_width(1100)
             .default_height(700)
             .build();
+        // GTK draws its own client-side title bar (with minimize/maximize/
+        // close icon buttons) unless told not to. This image has no icon
+        // theme installed, so those icon lookups were failing - producing
+        // "GtkImage ... reported baselines of minimum -2147483648" warnings
+        // that then fed garbage sizing into the render pipeline and crashed
+        // it. Protea is a fullscreen single-app shell with no need for a
+        // window title bar at all, so just turn decorations off outright.
+        window.set_decorated(false);
 
         let stack = Stack::new();
         stack.set_hexpand(true);
