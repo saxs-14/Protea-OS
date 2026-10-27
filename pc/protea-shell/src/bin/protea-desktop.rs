@@ -648,7 +648,16 @@ fn apply_css() {
     let provider = gtk::CssProvider::new();
     let background = match select_wallpaper() {
         Some(path) => format!(
-            "window {{ background-image: url(\"{}\"); background-size: cover; background-position: center; }}",
+            // "contain" rather than "cover": one bundled wallpaper
+            // (richtersveld.jpg) has an extreme ~7:1 banner aspect ratio.
+            // "cover" would need to scale that up enormously to fill a
+            // normal screen height, which is a strong candidate for the
+            // "too big" Cairo surface crash that started appearing the
+            // moment wallpapers and JPEG decoding both actually started
+            // working for the first time. "contain" never scales up
+            // anywhere near as aggressively regardless of source aspect
+            // ratio, at the cost of occasional letterboxing.
+            "window {{ background-image: url(\"{}\"); background-size: contain; background-position: center; background-repeat: no-repeat; }}",
             path.display()
         ),
         None => "window { background: #17120f; }".to_string(),
