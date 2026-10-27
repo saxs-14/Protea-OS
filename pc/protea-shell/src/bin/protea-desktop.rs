@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use gtk::{
     glib, Application, ApplicationWindow, Box, Button, EventControllerMotion, Label,
-    Orientation, Revealer, RevealerTransitionType, SearchEntry, Separator, Spinner, Stack,
+    Orientation, Revealer, RevealerTransitionType, SearchEntry, Separator, Stack,
     StackTransitionType, ToggleButton,
 };
 use protea_core::{DeviceClass, DeviceProfile, HardwareTier, Permission, ProteaIdentity, ProteaMode, ProteaState, StateStore};
@@ -206,16 +206,30 @@ fn build_splash_page() -> Box {
     let tagline = Label::new(Some("One identity. One system. Adaptive everywhere."));
     tagline.add_css_class("dim-label");
 
-    let spinner = Spinner::new();
-    spinner.set_size_request(32, 32);
-    spinner.start();
+    // A pulsing ProgressBar rather than a GtkSpinner: Spinner's internal
+    // animation implementation was the source of a real crash on this
+    // image (repeated "g_object_ref: assertion G_IS_OBJECT (object) failed"
+    // criticals immediately after the window presented, then a fatal Gdk
+    // shared-memory error). ProgressBar is a plain CSS-drawn rectangle with
+    // no equivalent internal machinery.
+    let progress = gtk::ProgressBar::new();
+    progress.set_show_text(false);
+    progress.set_width_request(220);
+    progress.set_halign(gtk::Align::Center);
+    {
+        let progress = progress.clone();
+        glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
+            progress.pulse();
+            glib::ControlFlow::Continue
+        });
+    }
 
     let status = Label::new(Some("Starting Protea..."));
     status.add_css_class("dim-label");
 
     centered.append(&logo);
     centered.append(&tagline);
-    centered.append(&spinner);
+    centered.append(&progress);
     centered.append(&status);
     page.append(&centered);
     page
