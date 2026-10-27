@@ -110,10 +110,23 @@ fn main() -> glib::ExitCode {
         }
 
         window.set_child(Some(&stack));
-        window.fullscreen();
         apply_css();
         window.present();
         eprintln!("PROTEA_DESKTOP_WINDOW_PRESENTED");
+
+        // Requesting fullscreen before the compositor has done its first
+        // configure/commit round-trip on this surface can hand GDK's
+        // Wayland backend an invalid (effectively garbage) buffer size for
+        // its very first frame, which crashes outright trying to create
+        // the backing Cairo surface. Let the window complete one normal
+        // frame first, then ask to go fullscreen.
+        {
+            let window = window.clone();
+            glib::timeout_add_local(std::time::Duration::from_millis(400), move || {
+                window.fullscreen();
+                glib::ControlFlow::Break
+            });
+        }
     });
 
     app.run_with_args(&[argv0])
