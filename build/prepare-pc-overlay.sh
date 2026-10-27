@@ -94,7 +94,16 @@ case "$1" in
         # X11 display. Open up the socket so the protea-user client can
         # actually connect to the root-owned compositor.
         chmod 777 "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" 2>/dev/null || true
-        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland /usr/bin/protea-desktop" &
+        # GSK_RENDERER=cairo: this image has no EGL configuration at all
+        # (no GPU driver, no software GL), so GSK's default behaviour -
+        # try the NGL renderer, fail, try the GL renderer, fail, then fall
+        # back to Cairo - leaves the renderer in a broken half-initialised
+        # state. That is the actual cause of the repeated "g_object_ref:
+        # assertion G_IS_OBJECT (object) failed" criticals and the fatal
+        # Wayland shared-memory-buffer crash a few hundred ms after the
+        # window first presents. Forcing Cairo directly skips the failed
+        # GL attempts and initialises it cleanly.
+        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland GSK_RENDERER=cairo /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK (wayland display: $WAYLAND_DISPLAY)"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
