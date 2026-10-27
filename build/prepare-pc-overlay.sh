@@ -71,7 +71,16 @@ case "$1" in
       done
       if [ -n "$WAYLAND_DISPLAY" ]; then
         export WAYLAND_DISPLAY
-        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' /usr/bin/protea-desktop" &
+        # weston runs as root (it needs DRM/input device access via
+        # libseat), so the socket it creates is root:root 0755. The
+        # unprivileged protea user has only r-x ("other") on that file,
+        # and connect(2) on a Unix domain socket requires write
+        # permission - without this, protea-desktop's wl_display_connect
+        # fails with EACCES and GTK silently falls back to a (nonexistent)
+        # X11 display. Open up the socket so the protea-user client can
+        # actually connect to the root-owned compositor.
+        chmod 777 "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" 2>/dev/null || true
+        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK (wayland display: $WAYLAND_DISPLAY)"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."

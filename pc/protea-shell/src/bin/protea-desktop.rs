@@ -202,6 +202,7 @@ fn main() -> glib::ExitCode {
         apply_mode_policy(state.mode);
         apply_css();
         window.present();
+        eprintln!("PROTEA_DESKTOP_WINDOW_PRESENTED");
     });
 
     app.run()

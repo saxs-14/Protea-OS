@@ -79,7 +79,15 @@ jobs:
           if grep -q "PROTEA_BOOT_OK" qemu-boot.log; then
             echo "QEMU PC image boot reached Protea system readiness."
             if grep -q "PROTEA_GRAPHICS_OK" qemu-boot.log; then
-              echo "Protea graphical session (Weston + protea-desktop) started."
+              if grep -Eqi "Failed to open display|Gtk-WARNING|Gtk-ERROR|protea-desktop.*panicked" qemu-boot.log; then
+                echo "Weston started but protea-desktop failed to connect/render - see qemu-boot.log."
+                exit 1
+              fi
+              if ! grep -q "PROTEA_DESKTOP_WINDOW_PRESENTED" qemu-boot.log; then
+                echo "Weston started but protea-desktop never reported its window as presented - see qemu-boot.log."
+                exit 1
+              fi
+              echo "Protea graphical session (Weston + protea-desktop) started and presented its window."
             else
               echo "Boot succeeded but the graphical session did not start - see qemu-boot.log."
               exit 1
