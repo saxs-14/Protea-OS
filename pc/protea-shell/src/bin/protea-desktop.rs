@@ -84,6 +84,15 @@ fn main() -> glib::ExitCode {
         // it. Protea is a fullscreen single-app shell with no need for a
         // window title bar at all, so just turn decorations off outright.
         window.set_decorated(false);
+        // This image has no Xcursor theme installed (pulling one in via
+        // Buildroot means enabling the whole X.org subsystem just for cursor
+        // data files on a pure-Wayland system - not worth it). Without an
+        // explicit cursor, GDK's Wayland backend tries to look up the
+        // themed default cursor itself, gets back a garbage/uninitialised
+        // size, and crashes trying to allocate the shared-memory buffer for
+        // it ("Truncating shared memory file failed: Invalid argument").
+        // A texture-based cursor needs no theme lookup at all.
+        window.set_cursor(Some(&build_pointer_cursor()));
 
         let stack = Stack::new();
         stack.set_hexpand(true);
@@ -138,6 +147,46 @@ fn main() -> glib::ExitCode {
     });
 
     app.run_with_args(&[argv0])
+}
+
+/// A small solid-circle pointer cursor built from raw pixel data rather than
+/// a themed Xcursor lookup (see the comment at window.set_cursor's call
+/// site for why that lookup crashes on this image).
+fn build_pointer_cursor() -> gtk::gdk::Cursor {
+    const SIZE: usize = 20;
+    let mut pixels = vec![0u8; SIZE * SIZE * 4];
+    let center = SIZE as f64 / 2.0;
+    let radius = SIZE as f64 / 2.6;
+
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let dx = x as f64 - center;
+            let dy = y as f64 - center;
+            let dist = (dx * dx + dy * dy).sqrt();
+            let idx = (y * SIZE + x) * 4;
+            if dist <= radius {
+                pixels[idx] = 255;
+                pixels[idx + 1] = 255;
+                pixels[idx + 2] = 255;
+                pixels[idx + 3] = 255;
+            } else if dist <= radius + 1.6 {
+                pixels[idx] = 15;
+                pixels[idx + 1] = 15;
+                pixels[idx + 2] = 15;
+                pixels[idx + 3] = 255;
+            }
+        }
+    }
+
+    let bytes = glib::Bytes::from_owned(pixels);
+    let texture = gtk::gdk::MemoryTexture::new(
+        SIZE as i32,
+        SIZE as i32,
+        gtk::gdk::MemoryFormat::R8g8b8a8,
+        &bytes,
+        SIZE * 4,
+    );
+    gtk::gdk::Cursor::from_texture(&texture, (SIZE / 2) as i32, (SIZE / 2) as i32, None)
 }
 
 fn build_splash_page() -> Box {
