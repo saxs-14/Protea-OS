@@ -50,30 +50,34 @@ append_config "BR2_PACKAGE_LIBGTK4_WAYLAND" "y"
 append_config "BR2_PACKAGE_WESTON" "y"
 append_config "BR2_PACKAGE_WESTON_DEFAULT_DRM" "y"
 append_config "BR2_PACKAGE_WESTON_SIMPLE_CLIENTS" "y"
-# BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SWRAST does not exist in current
-# Buildroot (verified against buildroot/buildroot master package/mesa3d/
-# Config.in - the real Gallium driver symbols are CROCUS/ETNAVIV/.../
-# LLVMPIPE/.../SOFTPIPE/..., no "SWRAST" entry anywhere). Kconfig silently
-# drops an unrecognized symbol during olddefconfig with no error, so this
-# line has been a complete no-op this whole time: no Gallium driver was
-# ever enabled, which forced BR2_PACKAGE_MESA3D_OPENGL_EGL and
-# BR2_PACKAGE_MESA3D_GBM off too (both "depends on" the Gallium-driver
-# bool, which only a real per-driver symbol can select) - exactly matching
-# the observed "could not open zink: zink_dri.so" / "No EGL configuration
-# available" messages and GTK 4.14's removed no-GL Cairo fallback crashing
-# on an unchecked oversized buffer. The real llvmpipe (software Gallium)
-# driver symbol also needs its own LLVM toggle turned on explicitly
-# (LLVMPIPE "depends on" MESA3D_LLVM, it does not select it).
+# CORRECTION: an earlier version of this comment claimed
+# BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SWRAST does not exist and tried
+# BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE instead - that was checked
+# against buildroot/buildroot's bleeding-edge "master" branch, not the
+# actual pinned release this build uses (see build/fetch-buildroot.sh:
+# VERSION="2025.02.18"). Re-verified directly against the real
+# buildroot/buildroot tag 2025.02.18 package/mesa3d/Config.in: SWRAST
+# does exist there and correctly selects BR2_PACKAGE_MESA3D_GALLIUM_
+# DRIVER; LLVMPIPE does not exist at all in this release (only in a
+# later one), so that line was itself exactly the kind of silently-
+# dropped-by-olddefconfig no-op it was trying to fix - and worse, since
+# it left NO Gallium driver selected at all, which is what actually
+# broke the build this time (protea-desktop/libgtk4 never got built:
+# BR2_PACKAGE_LIBGTK4 depends on BR2_PACKAGE_HAS_LIBEGL, which Mesa only
+# provides once a real Gallium driver is selected).
 #
-# This is the client-side half of the fix; Weston itself also needs the
-# same EGL/GBM/GLES trio present (see weston.mk: gl-renderer is compiled
-# in only when BR2_PACKAGE_HAS_LIBEGL + HAS_LIBGBM + HAS_LIBGLES are ALL
-# provided) or its own drm-backend silently falls back to the pixman
-# renderer, which has zero dma-buf/GL buffer-sharing support - so a
-# working client renderer would still have nothing to hand buffers to.
+# What's still correct and kept: BR2_PACKAGE_MESA3D_OPENGL_ES (verified
+# present in 2025.02.18 too) and an explicit BR2_PACKAGE_WAYLAND, since
+# Weston's own gl-renderer is only compiled in when Mesa provides
+# EGL+GBM+GLES together (weston.mk) - without gl-renderer, Weston's
+# drm-backend silently falls back to pixman, which has no dma-buf/GL
+# buffer-sharing support at all, so even a working GL client would have
+# had nothing to hand buffers to. weston.ini and the weston launch line
+# below now force renderer=gl explicitly for the same reason: so any
+# future failure here is a loud, diagnosable Weston error instead of a
+# silent fallback that looks fine but breaks every GL client.
 append_config "BR2_PACKAGE_MESA3D" "y"
-append_config "BR2_PACKAGE_MESA3D_LLVM" "y"
-append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE" "y"
+append_config "BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SWRAST" "y"
 append_config "BR2_PACKAGE_MESA3D_OPENGL_EGL" "y"
 append_config "BR2_PACKAGE_MESA3D_OPENGL_ES" "y"
 append_config "BR2_PACKAGE_MESA3D_GBM" "y"
