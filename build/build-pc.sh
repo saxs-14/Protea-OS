@@ -94,6 +94,22 @@ append_config "BR2_PACKAGE_CAIRO_ZLIB" "y"
 append_config "BR2_PACKAGE_GDK_PIXBUF" "y"
 append_config "BR2_PACKAGE_JPEG" "y"
 append_config "BR2_PACKAGE_LIBPNG" "y"
+# ROOT CAUSE of the protea-desktop segfault, finally resolved via a CI
+# diagnostic step that disassembled the real built libcairo.so.2.11804.4
+# directly (nm against three independent copies - host sysroot, the
+# per-package build dir, and the stripped target copy's dynamic symbol
+# table - all agreed): the crash is inside cairo_scaled_font_get_font_
+# options(), called by Pango/PangoCairo when laying out TEXT. This image
+# had zero font packages at all - no BR2_PACKAGE_DEJAVU, no explicit
+# fontconfig - so Pango had no real font to shape text with. That
+# explains every observation this session: content-independent (every
+# version of the desktop shows some text label), timing-consistent
+# (Pango lazily resolves/queries fonts on the first real text layout
+# pass, not at window-present time), and unaffected by every renderer/
+# wallpaper/decoration change tried, because none of those touch font
+# loading at all.
+append_config "BR2_PACKAGE_DEJAVU" "y"
+append_config "BR2_PACKAGE_FONTCONFIG" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660_GRUB2" "y"
 append_config "BR2_TARGET_ROOTFS_ISO9660_INITRD" "y"

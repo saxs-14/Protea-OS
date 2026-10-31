@@ -56,53 +56,6 @@ jobs:
           chmod +x build/fetch-buildroot.sh build/build-pc.sh build/prepare-pc-overlay.sh build/qemu/run-console.sh build/validate-pc-image.sh
           ./build/build-pc.sh
 
-      # TEMPORARY DIAGNOSTIC: protea-desktop has been segfaulting inside
-      # libcairo.so.2.11804.4 at the exact same ELF file offset (0x69bf8)
-      # across every configuration tried locally, but no local machine
-      # here has the RAM to download the ~650MB image artifact and
-      # disassemble it (repeatedly killed by low-memory protection).
-      # The runner building the image already has the real binary right
-      # here, unstripped, with plenty of RAM/disk - resolve the crashing
-      # function directly instead of guessing further. Remove once the
-      # real cause is found and fixed.
-      - name: DIAGNOSTIC - resolve libcairo.so crash offset to a symbol
-        run: |
-          echo "Looking for libcairo.so copies under output/pc ..."
-          find output/pc -iname 'libcairo.so*' -exec file {} \;
-          echo "---"
-          resolve() {
-            local lib="$1" label="$2"
-            # Full symbol table (.symtab, includes internal/static
-            # functions like cairo's many _cairo_* helpers) if present on
-            # an unstripped copy; dynamic-only (-D, exported symbols only)
-            # as a fallback for a stripped target copy, which would only
-            # resolve to the nearest PUBLIC cairo_* API function.
-            local syms
-            syms=$(nm --defined-only "$lib" 2>/dev/null | awk '$2 ~ /[TtWw]/ {print $1, $3}')
-            if [ -z "$syms" ]; then
-              syms=$(nm -D --defined-only "$lib" 2>/dev/null | awk '$2 ~ /[TtWw]/ {print $1, $3}')
-              label="$label (dynamic/exported symbols only - may be imprecise)"
-            fi
-            if [ -z "$syms" ]; then
-              echo "  [$label] no symbols at all (fully stripped)"
-              return
-            fi
-            echo "$syms" | sort | awk -v target=0x69bf8 -v label="$label" '
-              BEGIN { t = strtonum(target); best_addr=0; best_name="(before first symbol)" }
-              { addr = strtonum("0x" $1); if (addr <= t && addr >= best_addr) { best_addr = addr; best_name = $2 } }
-              END { printf "  [%s] target %s likely falls inside: %s (symbol at 0x%x, +0x%x into it)\n", label, target, best_name, best_addr, (t - best_addr) }
-            '
-          }
-          for lib in $(find output/pc -iname 'libcairo.so*' -type f); do
-            echo "=== $lib ==="
-            resolve "$lib" "$lib"
-          done
-          echo "--- full address-sorted symbol table (first match file), for manual cross-check ---"
-          FIRST_LIB=$(find output/pc -iname 'libcairo.so*' -type f | head -1)
-          if [ -n "$FIRST_LIB" ]; then
-            nm -D --defined-only "$FIRST_LIB" 2>/dev/null | awk '$2 ~ /[TtWw]/ {print $1, $3}' | sort | grep -A3 -B3 -i "^00000000000697\|^00000000000698\|^00000000000699\|^0000000000069a" || echo "(no symbols within ~0x100 of the target either way)"
-          fi
-
       - name: Verify expected image artifacts
         run: |
           test -s output/pc/images/bzImage
