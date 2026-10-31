@@ -141,6 +141,18 @@ case "$1" in
         # uses a fixed, sane scale of 1 instead.
         su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland GDK_SCALE=1 /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK (wayland display: $WAYLAND_DISPLAY)"
+        # weston.log was previously only dumped when the socket-wait loop
+        # timed out, so in every run where protea-desktop actually crashes
+        # (the socket DID appear, the crash happens afterward), this log -
+        # which contains weston's own authoritative "Using GL renderer" /
+        # "Using Pixman renderer" line plus the GL_RENDERER string from
+        # log_gl_info() - was never seen. Dump it unconditionally instead,
+        # after a short wait so it also covers protea-desktop's own crash
+        # window (observed consistently around 4-5s after it presents).
+        sleep 6
+        echo "---- weston.log ----"
+        cat /var/log/weston.log 2>&1 || echo "(no weston.log)"
+        echo "---------------------"
       else
         echo "Protea: Wayland compositor did not start; continuing headless."
         echo "---- weston.log ----"
