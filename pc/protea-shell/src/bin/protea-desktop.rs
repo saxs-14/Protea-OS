@@ -100,7 +100,7 @@ fn main() -> glib::ExitCode {
         stack.set_transition_type(StackTransitionType::Crossfade);
         stack.set_transition_duration(500);
 
-        let splash = build_splash_page();
+        let (splash, splash_pulse_timer) = build_splash_page();
         stack.add_named(&splash, Some("splash"));
 
         let (lock_page, sign_in_button) = build_lock_page(&state);
@@ -113,8 +113,24 @@ fn main() -> glib::ExitCode {
 
         {
             let stack = stack.clone();
+            // RefCell so the closure (Fn, called at most once since it
+            // returns Break) can still move the SourceId out to cancel it -
+            // leaving the splash page's pulse timer running forever after
+            // we switch away from it was a real, previously-unnoticed bug:
+            // it kept calling progress.pulse() on an off-screen widget for
+            // the rest of the process's life, landing squarely in the
+            // window where every crash this session has consistently
+            // happened (~4-5s after present, a fixed g_object_ref count,
+            // identical regardless of app content) - a background timer
+            // repeatedly invalidating a hidden widget is a much better fit
+            // for "content-independent, timing-dependent" than anything
+            // content-related tried before.
+            let splash_pulse_timer = std::cell::RefCell::new(Some(splash_pulse_timer));
             glib::timeout_add_local(std::time::Duration::from_millis(2200), move || {
                 stack.set_visible_child_name("lock");
+                if let Some(timer) = splash_pulse_timer.borrow_mut().take() {
+                    timer.remove();
+                }
                 glib::ControlFlow::Break
             });
         }
@@ -189,7 +205,7 @@ fn build_pointer_cursor() -> gtk::gdk::Cursor {
     gtk::gdk::Cursor::from_texture(&texture, (SIZE / 2) as i32, (SIZE / 2) as i32, None)
 }
 
-fn build_splash_page() -> Box {
+fn build_splash_page() -> (Box, glib::SourceId) {
     let page = Box::new(Orientation::Vertical, 0);
     page.add_css_class("protea-splash");
     page.set_hexpand(true);
@@ -216,13 +232,13 @@ fn build_splash_page() -> Box {
     progress.set_show_text(false);
     progress.set_width_request(220);
     progress.set_halign(gtk::Align::Center);
-    {
+    let pulse_timer = {
         let progress = progress.clone();
         glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
             progress.pulse();
             glib::ControlFlow::Continue
-        });
-    }
+        })
+    };
 
     let status = Label::new(Some("Starting Protea..."));
     status.add_css_class("dim-label");
@@ -232,7 +248,7 @@ fn build_splash_page() -> Box {
     centered.append(&progress);
     centered.append(&status);
     page.append(&centered);
-    page
+    (page, pulse_timer)
 }
 
 fn build_lock_page(state: &ProteaState) -> (Box, Button) {
@@ -621,15 +637,12 @@ const WALLPAPER_DIR: &str = "/usr/share/protea/wallpapers";
 /// when the directory is absent, e.g. running the shell outside the built
 /// Protea image during development.
 fn select_wallpaper() -> Option<std::path::PathBuf> {
-    // TEMPORARY DIAGNOSTIC: every prior crash happened after wallpaper
-    // CSS background-image loading started working; now that Weston's
-    // own log confirms a genuinely working GL renderer on both the
-    // compositor and (no more Gsk realize-failure messages) likely the
-    // client too, this isolates whether the image-loading path itself is
-    // still the trigger, independent of the renderer-availability issues
-    // already fixed. Revert this line once the result is known either way.
-    return None;
-    #[allow(unreachable_code)]
+    // Confirmed by direct test: the crash still happens identically with
+    // this returning None unconditionally (see git history for the
+    // temporary diagnostic that proved it) - and separately, the CI boot
+    // test never clicks "Sign In" so it never even reaches the desktop
+    // page this CSS applies to. Wallpaper loading was never the cause;
+    // restored to real behaviour.
     let mut entries: Vec<_> = std::fs::read_dir(WALLPAPER_DIR)
         .ok()?
         .flatten()
