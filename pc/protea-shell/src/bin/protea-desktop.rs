@@ -621,6 +621,15 @@ const WALLPAPER_DIR: &str = "/usr/share/protea/wallpapers";
 /// when the directory is absent, e.g. running the shell outside the built
 /// Protea image during development.
 fn select_wallpaper() -> Option<std::path::PathBuf> {
+    // TEMPORARY DIAGNOSTIC: every prior crash happened after wallpaper
+    // CSS background-image loading started working; now that Weston's
+    // own log confirms a genuinely working GL renderer on both the
+    // compositor and (no more Gsk realize-failure messages) likely the
+    // client too, this isolates whether the image-loading path itself is
+    // still the trigger, independent of the renderer-availability issues
+    // already fixed. Revert this line once the result is known either way.
+    return None;
+    #[allow(unreachable_code)]
     let mut entries: Vec<_> = std::fs::read_dir(WALLPAPER_DIR)
         .ok()?
         .flatten()
