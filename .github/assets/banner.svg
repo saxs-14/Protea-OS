@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" width="1200" height="260" role="img" aria-label="Protea OS - Cross-device operating system · Rust core · Linux &amp; Android">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#05070D"/><stop offset="0.55" stop-color="#21100D"/><stop offset="1" stop-color="#501F0D"/></linearGradient>
+    <linearGradient id="tt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#E3AB93"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#C1440E" stroke-opacity="0.12"/></pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="c"><rect width="1200" height="260" rx="18"/></clipPath>
+    <style>
+      .tr { fill: none; stroke: #C1440E; stroke-width: 2; stroke-opacity: 0.45; }
+      .fl { fill: none; stroke: #E3AB93; stroke-width: 2.5; stroke-dasharray: 14 220; animation: f 4s linear infinite; }
+      .fl.b { animation-duration: 5.5s; animation-delay: -2s; }
+      .nd { fill: #21100D; stroke: #C1440E; stroke-width: 2; }
+      .bn { font-family: Consolas,'Courier New',monospace; font-size: 13px; fill: #C1440E; fill-opacity: 0.3; }
+      .fx { animation: y 6s ease-in-out infinite; }
+      .cu { animation: k 1s steps(1) infinite; }
+      @keyframes f { from { stroke-dashoffset: 234; } to { stroke-dashoffset: 0; } }
+      @keyframes y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+      @keyframes k { 50% { opacity: 0; } }
+    </style>
+  </defs>
+  <g clip-path="url(#c)">
+    <rect width="1200" height="260" fill="url(#bg)"/>
+    <rect width="1200" height="260" fill="url(#grid)"/>
+    <text class="bn" x="36" y="36">0101 1100 0011</text>
+    <text class="bn" x="980" y="236">1011 0010 1110</text>
+    <path class="tr" d="M0 80H80L110 110H180"/><path class="fl" d="M0 80H80L110 110H180"/><circle class="nd" cx="180" cy="110" r="5"/>
+    <path class="tr" d="M0 190H60L90 160H150"/><path class="fl b" d="M0 190H60L90 160H150"/><circle class="nd" cx="150" cy="160" r="5"/>
+    <path class="tr" d="M1200 70H1120L1090 100H1030"/><path class="fl b" d="M1200 70H1120L1090 100H1030"/><circle class="nd" cx="1030" cy="100" r="5"/>
+    <path class="tr" d="M1200 200H1140L1110 170H1050"/><path class="fl" d="M1200 200H1140L1110 170H1050"/><circle class="nd" cx="1050" cy="170" r="5"/>
+    <g transform="translate(230 152)"><g class="fx" filter="url(#glow)"><g fill="none" stroke="#C1440E" stroke-width="2"><rect x="0" y="-44" width="50" height="50" rx="6" fill="#21100D"/><rect x="13" y="-31" width="24" height="24" rx="3" stroke="#E3AB93"/><path d="M10 -44v-8M25 -44v-8M40 -44v-8M10 6v8M25 6v8M40 6v8M0 -34h-8M0 -19h-8M0 -4h-8M50 -34h8M50 -19h8M50 -4h8"/></g></g></g>
+    <text x="1000" y="150" text-anchor="end" font-family="Consolas,monospace" font-size="30" fill="#E3AB93" fill-opacity="0.55">{ }</text>
+    <text x="600" y="118" text-anchor="middle" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="54" font-weight="700" fill="url(#tt)" filter="url(#glow)">Protea OS</text>
+    <text x="600" y="160" text-anchor="middle" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="19" fill="#E3AB93">Cross-device operating system · Rust core · Linux &amp; Android</text>
+    <text x="600" y="208" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="14" fill="#E3AB93" fill-opacity="0.8">built by saxsprojects · github.com/saxs-14<tspan class="cu">_</tspan></text>
+  </g>
+</svg>
