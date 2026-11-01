@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/assets/banner.svg" width="100%" alt="Protea OS banner"/></p>
+
 # Protea OS
 
 Protea OS is a long-term cross-device operating system project.
