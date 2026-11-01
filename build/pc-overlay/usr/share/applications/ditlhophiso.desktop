@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Ditlhophiso
+GenericName=Settings
+Comment=System settings and preferences for Protea OS
+Exec=protea-desktop --app settings
+Icon=preferences-system
+Categories=Settings;System;
+Terminal=false

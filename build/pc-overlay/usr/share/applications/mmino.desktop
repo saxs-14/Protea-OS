@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Mmino
+GenericName=Music Player
+Comment=South African local music player for Protea OS
+Exec=protea-desktop --app mmino
+Icon=audio-player
+Categories=AudioVideo;Audio;Player;
+Terminal=false

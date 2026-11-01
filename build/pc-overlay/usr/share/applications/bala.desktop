@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bala
+GenericName=Calculator
+Comment=System calculator for Protea OS
+Exec=protea-desktop --app calculator
+Icon=accessories-calculator
+Categories=Utility;Calculator;
+Terminal=false

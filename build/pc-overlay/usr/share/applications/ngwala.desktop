@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Ngwala
+GenericName=Notes
+Comment=Fast offline notes and checklists
+Exec=protea-desktop --app notes
+Icon=accessories-text-editor
+Categories=Office;Utility;
+Terminal=false
