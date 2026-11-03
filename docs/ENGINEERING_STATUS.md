@@ -1,77 +1,45 @@
 # Protea OS engineering status
 
-Date: 2026-10-13
+Date: 2026-11-03
 
 ## Executive summary
 
-This repository is not yet a complete, bootable, installable Protea OS release. The evidence in the repo and the current GitHub workflow history show that the shared core and initial PC-shell contracts are implemented, while the reproducible Buildroot PC image remains in a partial/broken state that still needs a clean, low-level validation pass.
+Protea OS is an active development foundation, not a finished operating-system release. The latest `main` commit (`6fde747`, 2026-11-01) has a successful PC image workflow: Buildroot produced the expected images, image-content validation passed, the PC image booted in QEMU through the graphical-window-presented marker, and the installation ISO reached the system-readiness marker. This verifies the automated CI paths, not human interaction, physical hardware compatibility, installation to disk, or recovery.
 
-The strongest evidence in the tree is:
+The previous status that called the Buildroot image pipeline broken is obsolete. The earlier failures remain useful history, but the latest successful run supersedes that assessment.
 
-- `core/protea-core` contains a versioned local-first state model for identity, settings, permissions, device profile, and mode policy.
-- `core/protea-core-cli` and `pc/protea-shell` both implement local state loading/saving and mode changes.
-- `build/build-pc.sh`, `build/prepare-pc-overlay.sh`, `build/validate-pc-image.sh`, and the Buildroot external tree define the PC image pipeline.
-- Remote workflow history shows repeated build failures in `Protea PC Image` followed by fixes for package configuration, Mesa driver selection, and runner disk pressure; the repo is therefore in the middle of the hardening loop, not in a finished release state.
+## Component status
 
-## Major component audit
-
-| Component | Intended role | Code present | Build/test status | Real-world status | Next action |
+| Component | Evidence found | Current status | Remaining work | Dependencies | Next action |
 | --- | --- | --- | --- | --- | --- |
-| Shared core | Versioned identity/settings/permission/device contracts | VERIFIED | VERIFIED (Rust unit tests present; local compile blocked here by missing linker toolchain, but code exists and tests are defined) | PARTIAL | Finish a clean toolchain-enabled validation run and keep contracts stable before expanding scope |
-| PC shell | User-facing Linux desktop shell and settings | VERIFIED for local CLI-based shell and GTK package integration | PARTIAL | PARTIAL | Validate the GTK shell in a running user session and confirm it boots cleanly from the image |
-| PC image build | Reproducible Buildroot x86_64 image generation | VERIFIED in scripts and config | BROKEN/UNVERIFIED in this environment; remote workflows show active failure chain | BROKEN | Resolve the remaining build root cause and keep the configuration deterministic |
-| Linux startup + init | Boot marker and boot configuration for Protea | VERIFIED script presence | UNVERIFIED | PARTIAL | Validate boot marker and startup ordering inside QEMU or a real VM |
-| Phone | AOSP-based phone shell foundation | PARTIAL | UNVERIFIED | PLANNED | Do not divert effort from the PC milestone until the shared contracts and PC image are stable |
-| Watch / TV | Future device classes | PLANNED | UNVERIFIED | PLANNED | Keep the scope strictly later-stage |
+| Shared Rust core | Core crate, versioned state and persistence; Core CI | Working and verified in CI | Broader migration and permission/security validation | Rust toolchain | Keep contracts stable; extend tests with concrete use cases |
+| PC shell | GTK4 shell; PC CI; QEMU CI detects graphical readiness and window presentation | Implemented; automated startup verified | Human interaction, accessibility, lifecycle and app-launch validation | Linux graphical runtime; QEMU or hardware | Run an interactive desktop session and exercise controls |
+| PC image | Buildroot external tree and latest successful image workflow | Working and verified in CI | Repeatable local download/runtime testing; installation and recovery | Linux Buildroot toolchain for local rebuild | Boot the published ISO in QEMU and VirtualBox; record results |
+| Boot and session startup | Init/overlay configuration; CI QEMU boot markers | Working and verified in CI | Input and interactive session behavior | QEMU or supported hardware | Validate keyboard/mouse interaction and session persistence |
+| Android launcher | Launcher implementation and successful Phone CI build | Implemented; build verified | AOSP integration and device/emulator runtime verification | Android/AOSP environment | Defer until PC interactive validation is complete |
+| Watch and TV | Project direction and placeholder documentation | Planned, not implemented | Platform-specific designs and implementations | Stable PC/phone foundation | Keep deferred |
+| CHPC environment | No cluster inventory or authorised connection evidence inspected | Blocked / not assessed | Establish approved access and verify candidates before use | Authorised SSH/config and cluster policy | Do not connect or deploy until access is provided and verified |
 
-## Status by major component
+## Verified evidence
 
-### Shared core — VERIFIED
+- Latest `Protea PC Image` run: GitHub Actions run `41356380128`, commit `6fde747`, completed successfully on 2026-11-01.
+- CI steps passed: Buildroot image build, expected artifact checks, image validation, QEMU PC-image boot, and QEMU installation-ISO boot.
+- The PC-image QEMU check requires `PROTEA_BOOT_OK`, `PROTEA_GRAPHICS_OK`, and `PROTEA_DESKTOP_WINDOW_PRESENTED`, and rejects known desktop crash signatures.
+- The ISO QEMU check requires `PROTEA_BOOT_OK`; it rejects graphics crash signatures when graphics readiness is reported, but does not require the desktop-window-presented marker.
+- The latest recorded Core, PC-shell, and Phone CI runs passed on 2026-10-23, 2026-10-31, and 2026-10-23 respectively.
+- No physical-device test or human-driven desktop interaction is evidenced by these checks.
 
-- Intended behavior: local-first identity, settings, permissions, hardware profile, and mode policy for all device classes.
-- Actual code: `core/protea-core/src/lib.rs` and `core/protea-core/src/persistence.rs` provide the model and persistence behavior.
-- Build status: the Rust workspace is defined and the code is structured for unit tests; full Rust validation is blocked in this environment because the C/C++ linker toolchain is missing (`cc` not found).
-- Testing: the library defines unit tests for settings replacement, permission toggling, memory tiering, mode policy, and initial state creation.
-- Hardware validation: no real hardware validation has been performed.
-- Missing/broken: the shared core is intentionally local-first and still lacks deeper authenticated sync, migration validation, and broader security review.
-- Next action: run the Rust workspace on a machine with the native C toolchain installed and then fix any real failures before expanding the contract.
+## Highest-priority remaining work
 
-### PC shell — PARTIAL
+1. Perform a human-driven desktop session test in QEMU: inspect the visible UI, interact with keyboard and mouse, launch an app, exercise settings/mode controls, and check the shell remains stable.
+2. Verify whether settings and identity persist across a reboot using the intended writable storage path.
+3. Validate input, networking, accessibility, shutdown/restart, and failure recovery in the guest.
+4. Plan installation and recovery workflows only after the interactive runtime path is reliable.
 
-- Intended behavior: local Linux desktop interaction, settings display, identity display, and mode switching.
-- Actual code: `pc/protea-shell/src/main.rs` and `pc/protea-shell/src/bin/protea-desktop.rs` implement a terminal/desktop shell with state persistence and a settings surface.
-- Build status: the code exists and is aligned with the repo’s architecture; it is not proven on an actual graphical Linux session in this environment.
-- Testing: no end-to-end graphical session tests were executed here.
-- Hardware validation: not performed.
-- Missing/broken: the shell remains a foundation, not a full desktop environment, and the bootable image path still needs proven validation.
-- Next action: validate the graphical stack in QEMU or a VM with a real Wayland session and confirm the Protea boot marker is emitted from the generated image.
+## Limitations
 
-### PC image / Buildroot — BROKEN / UNVERIFIED
-
-- Intended behavior: a reproducible x86_64 Linux image with Protea core, desktop package, overlay, and QEMU boot validation.
-- Actual code: `build/build-pc.sh`, `build/fetch-buildroot.sh`, `build/prepare-pc-overlay.sh`, `build/validate-pc-image.sh`, and the Buildroot external package definitions.
-- Build status: the current repo contains the build logic and the package fixes for known failures, but the image was not successfully built in this local environment.
-- Testing: remote GitHub workflow history shows a chain of failures culminating in runner disk exhaustion while generating Buildroot output. This shows the build is still not proven end-to-end.
-- Missing/broken: the exact full boot path is not proven; this is the project’s current critical gap.
-- Next action: on a machine with adequate disk space and the required Linux development packages, run the full `./build/build-pc.sh` and then `./build/validate-pc-image.sh` path and inspect the first failing command, not just the later disk issue.
-
-### Phone, watch, TV — PLANNED / UNVERIFIED
-
-- Intended behavior: later device-family integration after the shared core and PC path are stable.
-- Actual code: placeholder READMEs and launcher scaffolding exist for Android; no proven AOSP runtime or device bootstrap is complete.
-- Build status: not proven.
-- Hardware validation: not performed.
-- Missing/broken: no complete device-specific implementation is ready.
-- Next action: keep these as later milestones and avoid scope creep until PC and shared contracts are proven.
-
-## Required status labels
-
-- VERIFIED: shared core contracts, local persistence model, early Rust tests, initial architecture definitions.
-- PARTIAL: PC shell, Linux integration, and the overall PC image path.
-- PLANNED: phone/watch/TV work.
-- BROKEN: the Buildroot image pipeline, from the evidence of repeated failing CI and missing proof of generated artifacts.
-- UNVERIFIED: real hardware / real boot / VM boot claims beyond the available local evidence.
-
-## Conclusion
-
-The repo is a credible engineering foundation with real definitions and real code, but it still falls short of a complete Protea OS release. The highest-confidence actionable issue is to complete the Buildroot image validation loop and keep the shared contracts stable before moving into wider platform work.
+- CI boot markers demonstrate automated startup, not a complete or production-ready OS.
+- No physical PC, phone, watch, or TV compatibility has been established.
+- The Android launcher is not a complete AOSP-based Protea phone system.
+- Secure updates, verified boot, recovery, cross-device synchronization, and a release process remain future work.
+- CHPC access and candidate occupancy have not been checked.

@@ -27,8 +27,8 @@ This roadmap describes the path from an empty repository to a real operating sys
 - [x] Linux session bootstrap
 - [x] Desktop shell process
 - [x] Taskbar
-- [ ] Application/start surface
-- [ ] Window/application launching
+- [x] Application/start surface
+- [x] Window/application launching
 - [x] Protea settings surface
 - [x] Shared-core integration
 - [ ] Basic accessibility
@@ -55,17 +55,17 @@ Mode changes must remain safe and reversible.
 
 ## Phase 4 — Bootable Protea PC system
 
-- [ ] Reproducible Linux image
-- [ ] Bootloader
-- [ ] Kernel configuration
-- [ ] Filesystem
-- [ ] Display stack
+- [x] Reproducible Linux image
+- [x] Bootloader
+- [x] Kernel configuration
+- [x] Filesystem
+- [x] Display stack
 - [ ] Input stack
-- [ ] Protea session auto-start
+- [x] Protea session auto-start
 - [ ] Recovery environment
 - [ ] Installation documentation
 
-Current status: BROKEN/UNVERIFIED. The repository contains the build scripts and package definitions, but the end-to-end Buildroot image path is not yet proven on this machine and the Workflow history shows repeated image failures culminating in runner disk pressure.
+Current status: The Buildroot image path and automated QEMU boot checks are verified by the successful 2026-11-01 GitHub Actions run. Interactive desktop use, input behavior, installation, recovery, and physical hardware remain unverified.
 
 ## Phase 5 — Low-end hardware validation
 
