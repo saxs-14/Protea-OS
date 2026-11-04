@@ -149,6 +149,13 @@ fn main() -> glib::ExitCode {
             .unwrap_or(false)
         {
             eprintln!("PROTEA_DESKTOP_TEST_MODE");
+            let sign_in_button = sign_in_button.clone();
+            glib::timeout_add_seconds_local(3, move || {
+                eprintln!("PROTEA_DESKTOP_TEST_SIGN_IN_ACTIVATING");
+                sign_in_button.emit_clicked();
+                glib::ControlFlow::Break
+            });
+
             let stack = stack.clone();
             glib::timeout_add_seconds_local(2, move || {
                 if stack.visible_child_name().as_deref() == Some("desktop") {
