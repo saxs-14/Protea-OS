@@ -13,7 +13,7 @@ The previous status that called the Buildroot image pipeline broken is obsolete.
 | Component | Evidence found | Current status | Remaining work | Dependencies | Next action |
 | --- | --- | --- | --- | --- | --- |
 | Shared Rust core | Core crate, versioned state and persistence; Core CI | Working and verified in CI | Broader migration and permission/security validation | Rust toolchain | Keep contracts stable; extend tests with concrete use cases |
-| PC shell | GTK4 shell; PC CI; QEMU CI detects graphical readiness and window presentation | Implemented; automated startup verified | Human interaction, accessibility, lifecycle and app-launch validation | Linux graphical runtime; QEMU or hardware | Run an interactive desktop session and exercise controls |
+| PC shell | GTK4 shell; PC CI; QEMU CI boots the shell, exercises the Sign In button handler, and checks post-sign-in heartbeats | Implemented; automated sign-in flow verified | Human visual/input, accessibility, lifecycle and app-launch validation | Linux graphical runtime; QEMU or hardware | Run a human-driven desktop session and exercise controls |
 | PC image | Buildroot external tree and latest successful image workflow | Working and verified in CI | Repeatable local download/runtime testing; installation and recovery | Linux Buildroot toolchain for local rebuild | Boot the published ISO in QEMU and VirtualBox; record results |
 | Boot and session startup | Init/overlay configuration; CI QEMU boot markers | Working and verified in CI | Input and interactive session behavior | QEMU or supported hardware | Validate keyboard/mouse interaction and session persistence |
 | Android launcher | Launcher implementation and successful Phone CI build | Implemented; build verified | AOSP integration and device/emulator runtime verification | Android/AOSP environment | Defer until PC interactive validation is complete |
@@ -23,11 +23,12 @@ The previous status that called the Buildroot image pipeline broken is obsolete.
 ## Verified evidence
 
 - Latest `Protea PC Image` run: GitHub Actions run `41356380128`, commit `6fde747`, completed successfully on 2026-11-01.
+- Interactive desktop validation on `fix/qemu-interactive-desktop`: GitHub Actions run `41831880731`, commit `758f96d`, completed successfully on 2026-11-04.
 - CI steps passed: Buildroot image build, expected artifact checks, image validation, QEMU PC-image boot, and QEMU installation-ISO boot.
-- The PC-image QEMU check requires `PROTEA_BOOT_OK`, `PROTEA_GRAPHICS_OK`, and `PROTEA_DESKTOP_WINDOW_PRESENTED`, and rejects known desktop crash signatures.
+- The interactive QEMU check additionally exercises the GTK Sign In button handler in test mode and requires two post-sign-in desktop heartbeat markers.
 - The ISO QEMU check requires `PROTEA_BOOT_OK`; it rejects graphics crash signatures when graphics readiness is reported, but does not require the desktop-window-presented marker.
 - The latest recorded Core, PC-shell, and Phone CI runs passed on 2026-10-23, 2026-10-31, and 2026-10-23 respectively.
-- No physical-device test or human-driven desktop interaction is evidenced by these checks.
+- These automated checks do not verify physical keyboard/mouse delivery, visual quality, accessibility, or human-driven application use.
 
 ## Highest-priority remaining work
 
