@@ -24,7 +24,7 @@ chmod +x build/fetch-buildroot.sh build/build-pc.sh
 The resulting image must be tested before it is called a Protea OS release.
 
 The PC-image GitHub Actions workflow boots the built kernel and root filesystem
-in QEMU, sends Tab and Enter through QEMU's monitor to activate the lock-screen
+in QEMU, sends Enter through QEMU's monitor to activate the focused lock-screen
 Sign In button, and requires the desktop's GTK event loop to emit two
 post-sign-in heartbeat markers. The test-specific heartbeat is enabled only
 when the QEMU kernel command line contains `protea.qemu_test=1`. This validates

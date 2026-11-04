@@ -53,6 +53,8 @@ class BootLog:
             )
         self.history.append(line)
         print(line, end="", flush=True)
+        if "PROTEA_DESKTOP_SIGN_IN_FOCUS_FAILED" in line:
+            raise RuntimeError("The lock-screen Sign In button could not receive focus")
         if CRASH_PATTERN.search(ANSI_PATTERN.sub("", line)):
             raise RuntimeError(f"Guest reported a crash or boot failure: {line.strip()}")
         return line
@@ -193,9 +195,9 @@ def main():
             log.wait_for("PROTEA_DESKTOP_WINDOW_PRESENTED", 30)
             log.wait_for("PROTEA_DESKTOP_TEST_MODE", 10)
             log.wait_for("PROTEA_DESKTOP_LOCK_READY", 10)
+            log.wait_for("PROTEA_DESKTOP_SIGN_IN_FOCUSED", 1)
 
             time.sleep(0.6)
-            send_key(qmp, reader, "tab")
             send_key(qmp, reader, "ret")
             log.wait_for("PROTEA_DESKTOP_SIGNED_IN", 10)
             log.wait_for_count("PROTEA_DESKTOP_HEARTBEAT", 2, 10)

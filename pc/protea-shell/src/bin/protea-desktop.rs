@@ -113,6 +113,7 @@ fn main() -> glib::ExitCode {
 
         {
             let stack = stack.clone();
+            let sign_in_button = sign_in_button.clone();
             // RefCell so the closure (Fn, called at most once since it
             // returns Break) can still move the SourceId out to cancel it -
             // leaving the splash page's pulse timer running forever after
@@ -128,6 +129,11 @@ fn main() -> glib::ExitCode {
             let splash_pulse_timer = std::cell::RefCell::new(Some(splash_pulse_timer));
             glib::timeout_add_local(std::time::Duration::from_millis(2200), move || {
                 stack.set_visible_child_name("lock");
+                if sign_in_button.grab_focus() {
+                    eprintln!("PROTEA_DESKTOP_SIGN_IN_FOCUSED");
+                } else {
+                    eprintln!("PROTEA_DESKTOP_SIGN_IN_FOCUS_FAILED");
+                }
                 eprintln!("PROTEA_DESKTOP_LOCK_READY");
                 if let Some(timer) = splash_pulse_timer.borrow_mut().take() {
                     timer.remove();
