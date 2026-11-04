@@ -148,6 +148,7 @@ fn main() -> glib::ExitCode {
             .map(|value| value == "1")
             .unwrap_or(false)
         {
+            eprintln!("PROTEA_DESKTOP_TEST_MODE");
             let stack = stack.clone();
             glib::timeout_add_seconds_local(2, move || {
                 if stack.visible_child_name().as_deref() == Some("desktop") {

@@ -61,6 +61,11 @@ case "$1" in
     PROTEA_HOME=/home/protea
     PROTEA_STATE_DIR="$PROTEA_HOME/.local/share/protea"
     PROTEA_STATE_FILE="$PROTEA_STATE_DIR/state"
+    PROTEA_QEMU_TEST=
+    if grep -qw 'protea.qemu_test=1' /proc/cmdline; then
+      PROTEA_QEMU_TEST=1
+      echo "PROTEA_QEMU_TEST_MODE enabled"
+    fi
 
     if ! id protea >/dev/null 2>&1; then
       echo "Protea validation error: unprivileged protea user is missing."
@@ -139,7 +144,7 @@ case "$1" in
         # app content. Whatever scale weston reports for this virtio-gpu/
         # bochs-drm virtual display, forcing GDK_SCALE=1 bypasses it and
         # uses a fixed, sane scale of 1 instead.
-        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' GDK_BACKEND=wayland GDK_SCALE=1 /usr/bin/protea-desktop" &
+        su -s /bin/sh protea -c "HOME='$PROTEA_HOME' XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' WAYLAND_DISPLAY='$WAYLAND_DISPLAY' PROTEA_STATE_FILE='$PROTEA_STATE_FILE' PROTEA_QEMU_TEST='$PROTEA_QEMU_TEST' GDK_BACKEND=wayland GDK_SCALE=1 /usr/bin/protea-desktop" &
         echo "PROTEA_GRAPHICS_OK (wayland display: $WAYLAND_DISPLAY)"
         # weston.log was previously only dumped when the socket-wait loop
         # timed out, so in every run where protea-desktop actually crashes

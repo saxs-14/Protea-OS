@@ -191,6 +191,7 @@ def main():
             log.wait_for("PROTEA_BOOT_OK", 60)
             log.wait_for("PROTEA_GRAPHICS_OK", 15)
             log.wait_for("PROTEA_DESKTOP_WINDOW_PRESENTED", 30)
+            log.wait_for("PROTEA_DESKTOP_TEST_MODE", 10)
             log.wait_for("PROTEA_DESKTOP_LOCK_READY", 10)
 
             time.sleep(0.6)
