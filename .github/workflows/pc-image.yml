@@ -69,43 +69,18 @@ jobs:
       - name: Validate built PC image
         run: ./build/validate-pc-image.sh
 
-      - name: Boot PC image in QEMU
+      - name: Boot PC image and exercise desktop in QEMU
         run: |
           set +e
-          timeout 90s build/qemu/run-console.sh > qemu-boot.log 2>&1
+          timeout 90s python3 build/qemu/test-interactive.py \
+            --kernel output/pc/images/bzImage \
+            --rootfs output/pc/images/rootfs.ext2 > qemu-boot.log 2>&1
           code=$?
           set -e
           cat qemu-boot.log
-          # The console log has ANSI colour codes embedded INSIDE keywords
-          # (e.g. "Gtk-<esc>[1;33mWARNING<esc>[0m"), so a plain grep for
-          # "Gtk-WARNING" never matches - strip them first so pattern
-          # matching below actually works.
           sed -r 's/\x1b\[[0-9;]*m//g' qemu-boot.log > qemu-boot.clean.log
-          CRASH_PATTERN='reported baselines|g_object_ref: assertion|Unable to create Cairo image surface|segfault|Segmentation fault|protea-desktop.*panicked|Failed to open display'
-          if grep -q "PROTEA_BOOT_OK" qemu-boot.clean.log; then
-            echo "QEMU PC image boot reached Protea system readiness."
-            if grep -q "PROTEA_GRAPHICS_OK" qemu-boot.clean.log; then
-              if grep -Eqi "$CRASH_PATTERN" qemu-boot.clean.log; then
-                echo "Weston started but protea-desktop crashed or failed to render - see qemu-boot.log."
-                exit 1
-              fi
-              if ! grep -q "PROTEA_DESKTOP_WINDOW_PRESENTED" qemu-boot.clean.log; then
-                echo "Weston started but protea-desktop never reported its window as presented - see qemu-boot.log."
-                exit 1
-              fi
-              echo "Protea graphical session (Weston + protea-desktop) started and presented its window."
-            else
-              echo "Boot succeeded but the graphical session did not start - see qemu-boot.log."
-              exit 1
-            fi
-          elif grep -Eqi "Kernel panic|VFS: Unable to mount root fs|cannot mount root" qemu-boot.clean.log; then
-            echo "PC image kernel/root filesystem failure detected."
-            exit 1
-          elif [ "$code" -eq 124 ]; then
-            echo "PC image boot timed out before readiness."
-            exit 1
-          else
-            echo "PC image boot did not reach the expected readiness marker (exit $code)."
+          if [ "$code" -ne 0 ]; then
+            echo "QEMU boot or interactive desktop validation failed (exit $code)."
             exit 1
           fi
 

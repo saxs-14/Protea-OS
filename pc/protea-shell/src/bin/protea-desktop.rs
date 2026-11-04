@@ -128,6 +128,7 @@ fn main() -> glib::ExitCode {
             let splash_pulse_timer = std::cell::RefCell::new(Some(splash_pulse_timer));
             glib::timeout_add_local(std::time::Duration::from_millis(2200), move || {
                 stack.set_visible_child_name("lock");
+                eprintln!("PROTEA_DESKTOP_LOCK_READY");
                 if let Some(timer) = splash_pulse_timer.borrow_mut().take() {
                     timer.remove();
                 }
@@ -139,6 +140,20 @@ fn main() -> glib::ExitCode {
             let stack = stack.clone();
             sign_in_button.connect_clicked(move |_| {
                 stack.set_visible_child_name("desktop");
+                eprintln!("PROTEA_DESKTOP_SIGNED_IN");
+            });
+        }
+
+        if std::env::var("PROTEA_QEMU_TEST")
+            .map(|value| value == "1")
+            .unwrap_or(false)
+        {
+            let stack = stack.clone();
+            glib::timeout_add_seconds_local(2, move || {
+                if stack.visible_child_name().as_deref() == Some("desktop") {
+                    eprintln!("PROTEA_DESKTOP_HEARTBEAT");
+                }
+                glib::ControlFlow::Continue
             });
         }
 
