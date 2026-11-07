@@ -727,20 +727,16 @@ fn detect_memory_mb() -> u64 {
 
 const WALLPAPER_DIR: &str = "/usr/share/protea/wallpapers";
 
-/// Picks one bundled wallpaper (licensed South African heritage photography
-/// plus Protea branding art - see assets/wallpapers/CREDITS.md) using the
-/// current time as a cheap, dependency-free source of variety. Returns None
-/// when the directory is absent, e.g. running the shell outside the built
-/// Protea image during development.
-fn select_wallpaper() -> Option<std::path::PathBuf> {
-    // Confirmed by direct test: the crash still happens identically with
-    // this returning None unconditionally (see git history for the
-    // temporary diagnostic that proved it) - and separately, the CI boot
-    // test never clicks "Sign In" so it never even reaches the desktop
-    // page this CSS applies to. Wallpaper loading was never the cause;
-    // restored to real behaviour.
+/// Bundled wallpapers (licensed South African heritage photography plus
+/// Protea branding art - see assets/wallpapers/CREDITS.md), sorted for a
+/// stable, predictable order wherever they're listed (here and in the
+/// Settings wallpaper picker). Empty when the directory is absent, e.g.
+/// running the shell outside the built Protea image during development.
+fn list_wallpapers() -> Vec<std::path::PathBuf> {
     let mut entries: Vec<_> = std::fs::read_dir(WALLPAPER_DIR)
-        .ok()?
+        .ok()
+        .into_iter()
+        .flatten()
         .flatten()
         .map(|entry| entry.path())
         .filter(|path| {
@@ -751,15 +747,44 @@ fn select_wallpaper() -> Option<std::path::PathBuf> {
         })
         .collect();
     entries.sort();
+    entries
+}
+
+/// Picks the wallpaper to show: the user's saved choice from Settings if
+/// one is set (an empty "wallpaper" setting means "no preference"), else
+/// falls back to the current time as a cheap, dependency-free source of
+/// variety. Returns None when there are no bundled wallpapers at all.
+fn select_wallpaper() -> Option<std::path::PathBuf> {
+    // Confirmed by direct test: the crash still happens identically with
+    // this returning None unconditionally (see git history for the
+    // temporary diagnostic that proved it) - and separately, the CI boot
+    // test never clicks "Sign In" so it never even reaches the desktop
+    // page this CSS applies to. Wallpaper loading was never the cause;
+    // restored to real behaviour.
+    let entries = list_wallpapers();
     if entries.is_empty() {
         return None;
     }
+
+    if let Ok(state) = StateStore::new(state_path()).load() {
+        if let Some(chosen) = state.settings.get("wallpaper") {
+            if !chosen.is_empty() {
+                if let Some(path) = entries
+                    .iter()
+                    .find(|path| path.file_name().and_then(|name| name.to_str()) == Some(chosen))
+                {
+                    return Some(path.clone());
+                }
+            }
+        }
+    }
+
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let index = (nanos as usize) % entries.len();
-    Some(entries.remove(index))
+    Some(entries[index].clone())
 }
 
 fn apply_css() {
@@ -830,6 +855,39 @@ fn detect_battery() -> bool {
             name.starts_with("BAT")
         }))
         .unwrap_or(false)
+}
+
+/// eth0 is the only interface Protea brings up (see build/pc-overlay's
+/// S20network: `ip link set eth0 up` + `udhcpc -i eth0`) - there is no
+/// Wi-Fi stack and no static-IP configuration to show, so this is a
+/// status readout, not a settings surface. `ip` is already relied on by
+/// S20network, so it is known to be present on this image.
+fn detect_network_status() -> String {
+    let operstate = std::fs::read_to_string("/sys/class/net/eth0/operstate")
+        .map(|value| value.trim().to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+
+    if operstate != "up" {
+        return "eth0: not connected".to_string();
+    }
+
+    let output_text = std::process::Command::new("ip")
+        .args(["-4", "-o", "addr", "show", "eth0"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok());
+
+    let address = output_text.as_deref().and_then(|text| {
+        let mut words = text.split_whitespace();
+        words.find(|&word| word == "inet")?;
+        words.next()
+    }).map(|cidr| cidr.split('/').next().unwrap_or(cidr).to_string());
+
+    match address {
+        Some(ip) => format!("eth0: {ip} (DHCP)"),
+        None => "eth0: connected, no address yet".to_string(),
+    }
 }
 
 
@@ -1164,14 +1222,26 @@ fn build_settings_page(back_label: &str, on_back: impl Fn() + 'static) -> Box {
     root.append(&title);
 
     root.append(&Label::new(Some(&format!(
-        "Device: {:?}  •  Tier: {:?}  •  Mode: {:?}",
-        state.device.class, state.device.tier, state.mode
+        "Device: {:?}  •  Tier: {:?}  •  RAM: {} MB  •  Storage: {} MB  •  GPU: {}  •  Battery: {}  •  Mode: {:?}",
+        state.device.class, state.device.tier, state.device.memory_mb, state.device.storage_mb,
+        if state.device.has_gpu { "yes" } else { "no" },
+        if state.device.has_battery { "yes" } else { "no" }, state.mode
     ))));
 
-    let identity_text = state.identity.as_ref()
-        .map(|identity| identity.display_name.as_str())
-        .unwrap_or("Not configured");
-    root.append(&Label::new(Some(&format!("Local identity: {identity_text}"))));
+    root.append(&Label::new(Some(&detect_network_status())));
+    root.append(&Separator::new(Orientation::Horizontal));
+
+    let name_row = Box::new(Orientation::Horizontal, 10);
+    let name_label = Label::new(Some("Display name"));
+    name_label.set_width_chars(12);
+    let name_entry = gtk::Entry::new();
+    name_entry.set_hexpand(true);
+    name_entry.set_text(
+        state.identity.as_ref().map(|identity| identity.display_name.as_str()).unwrap_or("Protea User"),
+    );
+    name_row.append(&name_label);
+    name_row.append(&name_entry);
+    root.append(&name_row);
 
     let theme_row = Box::new(Orientation::Horizontal, 10);
     let theme_label = Label::new(Some("Theme"));
@@ -1182,6 +1252,32 @@ fn build_settings_page(back_label: &str, on_back: impl Fn() + 'static) -> Box {
     theme_row.append(&theme_label);
     theme_row.append(&theme_entry);
     root.append(&theme_row);
+
+    // "Random" is always index 0, so an unset/empty "wallpaper" setting
+    // (see select_wallpaper) maps straight back to it.
+    let mut wallpaper_options: Vec<String> = vec!["Random".to_string()];
+    wallpaper_options.extend(
+        list_wallpapers()
+            .iter()
+            .filter_map(|path| path.file_name().and_then(|name| name.to_str()).map(String::from)),
+    );
+    let option_refs: Vec<&str> = wallpaper_options.iter().map(String::as_str).collect();
+
+    let wallpaper_row = Box::new(Orientation::Horizontal, 10);
+    let wallpaper_label = Label::new(Some("Wallpaper"));
+    wallpaper_label.set_width_chars(12);
+    let wallpaper_dropdown = gtk::DropDown::from_strings(&option_refs);
+    wallpaper_dropdown.set_hexpand(true);
+    let current_wallpaper = state.settings.get("wallpaper").unwrap_or("");
+    let initial_index = if current_wallpaper.is_empty() {
+        0
+    } else {
+        wallpaper_options.iter().position(|name| name == current_wallpaper).unwrap_or(0) as u32
+    };
+    wallpaper_dropdown.set_selected(initial_index);
+    wallpaper_row.append(&wallpaper_label);
+    wallpaper_row.append(&wallpaper_dropdown);
+    root.append(&wallpaper_row);
 
     let info = Label::new(Some(&format!(
         "{} local settings. Changes are written to the local Protea state file.",
@@ -1199,18 +1295,43 @@ fn build_settings_page(back_label: &str, on_back: impl Fn() + 'static) -> Box {
     root.append(&actions);
 
     let save_store = StateStore::new(state_path());
-    let save_entry = theme_entry.clone();
+    let save_name_entry = name_entry.clone();
+    let save_theme_entry = theme_entry.clone();
     let save_info = info.clone();
     save.connect_clicked(move |_| {
         let mut current = load_or_initialize(&save_store);
-        let theme = save_entry.text().trim().to_string();
+
+        let display_name = save_name_entry.text().trim().to_string();
+        if display_name.is_empty() {
+            save_info.set_text("Display name cannot be empty.");
+            return;
+        }
+        let theme = save_theme_entry.text().trim().to_string();
         if theme.is_empty() {
             save_info.set_text("Theme cannot be empty.");
             return;
         }
+
+        let local_id = current.identity.as_ref()
+            .map(|identity| identity.local_id.clone())
+            .unwrap_or_else(|| "local-0001".to_string());
+        current.set_identity(ProteaIdentity::new(local_id, display_name));
         current.settings.set("theme", theme);
+
+        let selected_wallpaper = wallpaper_options
+            .get(wallpaper_dropdown.selected() as usize)
+            .cloned()
+            .unwrap_or_else(|| "Random".to_string());
+        current.settings.set(
+            "wallpaper",
+            if selected_wallpaper == "Random" { String::new() } else { selected_wallpaper },
+        );
+
         match save_store.save(&current) {
-            Ok(()) => save_info.set_text("Settings saved locally."),
+            Ok(()) => {
+                save_info.set_text("Settings saved locally.");
+                apply_css();
+            }
             Err(error) => save_info.set_text(&format!("Could not save settings: {error:?}")),
         }
     });
