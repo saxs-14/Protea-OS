@@ -106,8 +106,8 @@ fn main() -> glib::ExitCode {
         let (lock_page, sign_in_button) = build_lock_page(&state);
         stack.add_named(&lock_page, Some("lock"));
 
-        let desktop_page = build_desktop_page(app, &state);
-        stack.add_named(&desktop_page, Some("desktop"));
+        let shell_page = build_shell_page(app, &state);
+        stack.add_named(&shell_page, Some("shell"));
 
         stack.set_visible_child_name("splash");
 
@@ -139,7 +139,7 @@ fn main() -> glib::ExitCode {
         {
             let stack = stack.clone();
             sign_in_button.connect_clicked(move |_| {
-                stack.set_visible_child_name("desktop");
+                stack.set_visible_child_name("shell");
                 eprintln!("PROTEA_DESKTOP_SIGNED_IN");
             });
         }
@@ -158,7 +158,7 @@ fn main() -> glib::ExitCode {
 
             let stack = stack.clone();
             glib::timeout_add_seconds_local(2, move || {
-                if stack.visible_child_name().as_deref() == Some("desktop") {
+                if stack.visible_child_name().as_deref() == Some("shell") {
                     eprintln!("PROTEA_DESKTOP_HEARTBEAT");
                 }
                 glib::ControlFlow::Continue
@@ -318,11 +318,7 @@ fn build_lock_page(state: &ProteaState) -> (Box, Button) {
     (page, sign_in_button)
 }
 
-fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
-    let page = Box::new(Orientation::Vertical, 0);
-    page.set_hexpand(true);
-    page.set_vexpand(true);
-
+fn build_desktop_page(app_stack: &Stack, state: &ProteaState) -> (Box, Button) {
     let content = Box::new(Orientation::Vertical, 18);
     content.set_vexpand(true);
     content.set_margin_top(32);
@@ -394,9 +390,9 @@ fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
     system.append(&shutdown_button);
     content.append(&system);
 
-    let settings_app = app.clone();
+    let settings_app_stack = app_stack.clone();
     settings_button.connect_clicked(move |_| {
-        open_settings_window(&settings_app);
+        settings_app_stack.set_visible_child_name("settings");
     });
 
     reboot_button.connect_clicked(move |_| {
@@ -439,10 +435,60 @@ fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
 
     apply_mode_policy(state.mode);
 
+    (content, start)
+}
+
+/// The persistent, Windows-like shell shown after sign-in: an inner Stack
+/// holding the desktop plus each bundled app as its own page, wrapped with
+/// one taskbar that is never torn down when switching between them. This
+/// replaces the old per-app `protea-desktop --app <name>` separate-process
+/// windows as the primary way to use the bundled apps, trading per-app
+/// process isolation for instant switching - Weston 14.0.1 has no
+/// wlr-foreign-toplevel-management support, so a cross-process taskbar
+/// could not focus/restore another client's window anyway (see
+/// docs/IMPLEMENTATION-STATUS.md). The `--app` entry points still exist
+/// standalone for debugging (see open_settings_window and friends).
+fn build_shell_page(app: &Application, state: &ProteaState) -> Box {
+    let page = Box::new(Orientation::Vertical, 0);
+    page.set_hexpand(true);
+    page.set_vexpand(true);
+
+    let app_stack = Stack::new();
+    app_stack.set_hexpand(true);
+    app_stack.set_vexpand(true);
+    app_stack.set_transition_type(StackTransitionType::Crossfade);
+    app_stack.set_transition_duration(250);
+
+    let (desktop_page, desktop_start_button) = build_desktop_page(&app_stack, state);
+    app_stack.add_named(&desktop_page, Some("desktop"));
+
+    {
+        let back_stack = app_stack.clone();
+        let settings_page = build_settings_page("← Back", move || {
+            back_stack.set_visible_child_name("desktop");
+        });
+        app_stack.add_named(&settings_page, Some("settings"));
+    }
+    {
+        let back_stack = app_stack.clone();
+        let notes_page = build_notes_page("← Back", move || {
+            back_stack.set_visible_child_name("desktop");
+        });
+        app_stack.add_named(&notes_page, Some("notes"));
+    }
+    {
+        let back_stack = app_stack.clone();
+        let calculator_page = build_calculator_page("← Back", move || {
+            back_stack.set_visible_child_name("desktop");
+        });
+        app_stack.add_named(&calculator_page, Some("calculator"));
+    }
+
+    app_stack.set_visible_child_name("desktop");
+
     // Bottom taskbar, Windows-style: wrapped in a Revealer so it can
-    // auto-hide, and placed after `content` (which is vexpand) so it is
-    // flush against the bottom edge of the screen rather than floating
-    // directly under the content block.
+    // auto-hide, placed after `app_stack` (which is vexpand) so it stays
+    // flush against the bottom edge of the screen.
     let taskbar = Box::new(Orientation::Horizontal, 10);
     taskbar.add_css_class("protea-taskbar");
     taskbar.set_margin_start(12);
@@ -452,6 +498,26 @@ fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
 
     let start_menu = Button::with_label("Protea");
     taskbar.append(&start_menu);
+
+    // Pinned quick-switch buttons: the actual "taskbar can switch between
+    // them" behaviour - instant, no process spawn, no window-manager
+    // protocol needed since it's all one Stack in one process.
+    let pinned = Box::new(Orientation::Horizontal, 4);
+    let pinned_apps: [(&str, &str); 4] = [
+        ("Desktop", "desktop"),
+        ("Settings", "settings"),
+        ("Notes", "notes"),
+        ("Calculator", "calculator"),
+    ];
+    for (label, target) in pinned_apps {
+        let button = Button::with_label(label);
+        let app_stack_for_pin = app_stack.clone();
+        button.connect_clicked(move |_| {
+            app_stack_for_pin.set_visible_child_name(target);
+        });
+        pinned.append(&button);
+    }
+    taskbar.append(&pinned);
 
     let running_box = Box::new(Orientation::Horizontal, 6);
     running_box.set_hexpand(true);
@@ -498,7 +564,7 @@ fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
     revealer.set_child(Some(&taskbar));
     revealer.set_valign(gtk::Align::End);
 
-    page.append(&content);
+    page.append(&app_stack);
     page.append(&revealer);
 
     install_taskbar_auto_hide(&page, &revealer);
@@ -506,23 +572,30 @@ fn build_desktop_page(app: &Application, state: &ProteaState) -> Box {
     let start_menu_app = app.clone();
     let start_menu_running = running_apps.clone();
     let start_menu_running_box = running_box.clone();
+    let start_menu_app_stack = app_stack.clone();
     start_menu.connect_clicked(move |_| {
-        open_app_launcher(&start_menu_app, start_menu_running.clone(), &start_menu_running_box);
+        open_app_launcher(
+            &start_menu_app,
+            start_menu_running.clone(),
+            &start_menu_running_box,
+            &start_menu_app_stack,
+        );
     });
 
     let start_app = app.clone();
     let start_running = running_apps.clone();
     let start_running_box = running_box.clone();
-    start.connect_clicked(move |_| {
-        open_app_launcher(&start_app, start_running.clone(), &start_running_box);
+    let start_app_stack = app_stack.clone();
+    desktop_start_button.connect_clicked(move |_| {
+        open_app_launcher(&start_app, start_running.clone(), &start_running_box, &start_app_stack);
     });
 
     page
 }
 
 /// Reveals the bottom taskbar while the pointer is near the bottom edge of
-/// the desktop page, and hides it again a short moment after the pointer
-/// moves away - the same "auto-hide" behaviour as the Windows taskbar.
+/// the shell, and hides it again a short moment after the pointer moves
+/// away - the same "auto-hide" behaviour as the Windows taskbar.
 fn install_taskbar_auto_hide(page: &Box, revealer: &Revealer) {
     const HOT_ZONE_PX: f64 = 56.0;
     const HIDE_DELAY_MS: u64 = 900;
@@ -760,7 +833,35 @@ fn detect_battery() -> bool {
 }
 
 
-fn open_app_launcher(app: &Application, running_apps: RunningApps, running_box: &Box) {
+/// Where a launcher entry's Exec command should go. Protea's own bundled
+/// apps are all `protea-desktop --app <name>`; recognising that pattern
+/// lets the launcher switch the shell's app_stack in place instead of
+/// spawning a second process - the one piece of real window management
+/// Protea has without compositor-level foreign-toplevel support (see
+/// docs/IMPLEMENTATION-STATUS.md). Anything else falls back to a real
+/// spawned process, same as before.
+enum LauncherTarget {
+    InternalPage(&'static str),
+    Unavailable(&'static str, &'static str),
+}
+
+fn classify_internal_app(command: &[String]) -> Option<LauncherTarget> {
+    let pos = command.iter().position(|arg| arg == "--app")?;
+    match command.get(pos + 1)?.as_str() {
+        "settings" => Some(LauncherTarget::InternalPage("settings")),
+        "notes" => Some(LauncherTarget::InternalPage("notes")),
+        "calculator" => Some(LauncherTarget::InternalPage("calculator")),
+        "mmino" => Some(LauncherTarget::Unavailable("Mmino", "music player")),
+        _ => None,
+    }
+}
+
+fn open_app_launcher(
+    app: &Application,
+    running_apps: RunningApps,
+    running_box: &Box,
+    app_stack: &Stack,
+) {
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Protea Start Menu")
@@ -798,7 +899,22 @@ fn open_app_launcher(app: &Application, running_apps: RunningApps, running_box: 
             let running_apps = running_apps.clone();
             let running_box = running_box.clone();
             let window_for_launch = window.clone();
+            let app_for_launch = app.clone();
+            let app_stack_for_launch = app_stack.clone();
             button.connect_clicked(move |_| {
+                if let Some(target) = classify_internal_app(&launch_command) {
+                    window_for_launch.close();
+                    match target {
+                        LauncherTarget::InternalPage(page_name) => {
+                            app_stack_for_launch.set_visible_child_name(page_name);
+                        }
+                        LauncherTarget::Unavailable(name, kind) => {
+                            open_unavailable_app_notice(&app_for_launch, name, kind);
+                        }
+                    }
+                    return;
+                }
+
                 match launch_application(&launch_command) {
                     Ok(child) => {
                         spawn_tracked(child, &launch_name, running_apps.clone(), &running_box);
@@ -1029,16 +1145,13 @@ fn launch_application(command: &[String]) -> std::io::Result<std::process::Child
 }
 
 
-fn open_settings_window(app: &Application) {
+/// Settings' real content, shared by the in-shell "settings" stack page and
+/// the standalone `--app settings` debug window - `back_label`/`on_back`
+/// are the only difference between the two (switch the shell's app_stack
+/// back vs. close a real window).
+fn build_settings_page(back_label: &str, on_back: impl Fn() + 'static) -> Box {
     let store = StateStore::new(state_path());
     let state = load_or_initialize(&store);
-
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Protea Settings")
-        .default_width(600)
-        .default_height(520)
-        .build();
 
     let root = Box::new(Orientation::Vertical, 14);
     root.set_margin_top(24);
@@ -1080,9 +1193,9 @@ fn open_settings_window(app: &Application) {
     let actions = Box::new(Orientation::Horizontal, 10);
     let save = Button::with_label("Save");
     save.add_css_class("suggested-action");
-    let close = Button::with_label("Close");
+    let back = Button::with_label(back_label);
     actions.append(&save);
-    actions.append(&close);
+    actions.append(&back);
     root.append(&actions);
 
     let save_store = StateStore::new(state_path());
@@ -1102,10 +1215,24 @@ fn open_settings_window(app: &Application) {
         }
     });
 
-    let window_close = window.clone();
-    close.connect_clicked(move |_| window_close.close());
+    back.connect_clicked(move |_| on_back());
 
-    window.set_child(Some(&root));
+    root
+}
+
+/// Standalone `protea-desktop --app settings` debug entry point: wraps the
+/// shared page in a real window instead of switching the shell's app_stack.
+fn open_settings_window(app: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Protea Settings")
+        .default_width(600)
+        .default_height(520)
+        .build();
+
+    let window_close = window.clone();
+    let page = build_settings_page("Close", move || window_close.close());
+    window.set_child(Some(&page));
     window.present();
 }
 
@@ -1116,15 +1243,10 @@ fn notes_path() -> std::path::PathBuf {
     std::path::PathBuf::from(".protea/notes.txt")
 }
 
-fn open_notes_window(app: &Application) {
+/// Notes' real content, shared by the in-shell "notes" stack page and the
+/// standalone `--app notes` debug window.
+fn build_notes_page(back_label: &str, on_back: impl Fn() + 'static) -> Box {
     let path = notes_path();
-
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Ngwala — Notes")
-        .default_width(480)
-        .default_height(560)
-        .build();
 
     let root = Box::new(Orientation::Vertical, 10);
     root.set_margin_top(16);
@@ -1152,9 +1274,9 @@ fn open_notes_window(app: &Application) {
     let actions = Box::new(Orientation::Horizontal, 8);
     let save = Button::with_label("Save");
     save.add_css_class("suggested-action");
-    let close = Button::with_label("Close");
+    let back = Button::with_label(back_label);
     actions.append(&save);
-    actions.append(&close);
+    actions.append(&back);
     root.append(&actions);
 
     let save_path = path.clone();
@@ -1172,29 +1294,41 @@ fn open_notes_window(app: &Application) {
         }
     });
 
-    let window_close = window.clone();
-    close.connect_clicked(move |_| window_close.close());
+    back.connect_clicked(move |_| on_back());
 
-    window.set_child(Some(&root));
+    root
+}
+
+/// Standalone `protea-desktop --app notes` debug entry point.
+fn open_notes_window(app: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Ngwala — Notes")
+        .default_width(480)
+        .default_height(560)
+        .build();
+
+    let window_close = window.clone();
+    let page = build_notes_page("Close", move || window_close.close());
+    window.set_child(Some(&page));
     window.present();
 }
 
 type CalculatorState = Rc<RefCell<(f64, Option<char>, String)>>;
 
-fn open_calculator_window(app: &Application) {
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Bala — Calculator")
-        .default_width(300)
-        .default_height(420)
-        .resizable(false)
-        .build();
-
+/// Calculator's real content, shared by the in-shell "calculator" stack
+/// page and the standalone `--app calculator` debug window.
+fn build_calculator_page(back_label: &str, on_back: impl Fn() + 'static) -> Box {
     let root = Box::new(Orientation::Vertical, 10);
     root.set_margin_top(16);
     root.set_margin_bottom(16);
     root.set_margin_start(16);
     root.set_margin_end(16);
+
+    let header = Box::new(Orientation::Horizontal, 8);
+    let back = Button::with_label(back_label);
+    header.append(&back);
+    root.append(&header);
 
     let display = Label::new(Some("0"));
     display.set_halign(gtk::Align::End);
@@ -1229,7 +1363,23 @@ fn open_calculator_window(app: &Application) {
     }
 
     root.append(&grid);
-    window.set_child(Some(&root));
+    back.connect_clicked(move |_| on_back());
+    root
+}
+
+/// Standalone `protea-desktop --app calculator` debug entry point.
+fn open_calculator_window(app: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Bala — Calculator")
+        .default_width(300)
+        .default_height(420)
+        .resizable(false)
+        .build();
+
+    let window_close = window.clone();
+    let page = build_calculator_page("Close", move || window_close.close());
+    window.set_child(Some(&page));
     window.present();
 }
 
